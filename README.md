@@ -1,4 +1,7 @@
 # 🌸 YouTube Customizer
+
+<p align="center"><img src="assets/logo.png" alt="YouTube Customizer logo" width="180"></p>
+
 <!-- Project overview, feature reference, and usage guide. -->
 
 🌸 · ✿ · 🌸 · ✿ · 🌸
@@ -63,6 +66,7 @@ After changing the extension files, open the browser's extensions page and click
 
 ## 🌸 Project Structure
 
+- `assets/logo.png` is the original project logo; `icons/` contains the size-specific app icons derived from it.
 - `manifest.json` defines the extension metadata, permissions, and content scripts.
 - `settings.js` contains shared defaults, validation, and presets.
 - `popup.html`, `popup.css`, and `popup.js` implement the extension settings UI.

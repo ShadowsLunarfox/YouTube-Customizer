@@ -52,28 +52,12 @@ body {
 }
 
 .app-icon {
-  position: relative;
-  flex: 0 0 16px;
-  height: 16px;
-  background: var(--face);
-  box-shadow: var(--raised);
-}
-
-.app-icon::before {
-  position: absolute;
-  inset: 3px;
-  background: #008080;
-  content: "";
-}
-
-.app-icon::after {
-  position: absolute;
-  top: 5px;
-  left: 6px;
-  border-top: 3px solid transparent;
-  border-bottom: 3px solid transparent;
-  border-left: 5px solid var(--light);
-  content: "";
+  display: block;
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  image-rendering: pixelated;
 }
 
 h1 {

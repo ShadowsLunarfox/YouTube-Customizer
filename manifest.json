@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "YouTube Customizer",
+  "description": "Personalize YouTube backgrounds, colors, progress icons, and page layout.",
+  "version": "2.5.5",
+  "permissions": ["storage", "scripting"],
+  "host_permissions": ["*://*.youtube.com/*"],
+  "action": {
+    "default_title": "YouTube Customizer",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.youtube.com/*"],
+      "js": [
+        "settings.js",
+        "content/surface-controller.js",
+        "content/shorts-controller.js",
+        "content/homepage-glass.js",
+        "yt.js"
+      ],
+      "all_frames": true,
+      "run_at": "document_idle"
+    }
+  ]
+}

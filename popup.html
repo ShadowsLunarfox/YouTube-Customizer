@@ -1,0 +1,111 @@
+<!doctype html>
+<!-- Provides the accessible settings form for the YouTube Customizer extension. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>YouTube Customizer</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main class="panel">
+      <header class="title-bar">
+        <span class="app-icon" aria-hidden="true"></span>
+        <h1>YouTube Customizer</h1>
+      </header>
+      <form id="settings-form" inert>
+        <div class="tabs" role="tablist" aria-label="Settings">
+          <button type="button" role="tab" id="tab-appearance" aria-controls="appearance-panel" aria-selected="true">Appearance</button>
+          <button type="button" role="tab" id="tab-player" aria-controls="player-panel" aria-selected="false" tabindex="-1">Player</button>
+          <button type="button" role="tab" id="tab-layout" aria-controls="layout-panel" aria-selected="false" tabindex="-1">Layout</button>
+        </div>
+        <div class="tab-content">
+          <section id="appearance-panel" role="tabpanel" aria-labelledby="tab-appearance" tabindex="0">
+            <div class="theme-preview" role="img" aria-label="Page theme preview">
+              <div class="theme-preview-header"><span class="preview-brand">YouTube</span><span class="preview-search"></span></div>
+              <div class="theme-preview-body">
+                <div class="theme-preview-sidebar"><i></i><i></i><i></i></div>
+                <div class="theme-preview-content"><div class="theme-preview-video"></div><span class="preview-line"></span><span class="preview-line short"></span></div>
+              </div>
+            </div>
+            <fieldset><legend>Theme</legend><div class="field-list">
+<label class="check-field"><input type="checkbox" id="themeEnabled"><span>Enable page theme</span></label>
+<label class="field"><span>Preset</span><select id="themePreset"><option value="original">Original YouTube</option><option value="charcoal">Charcoal</option><option value="light">Light</option><option value="forest">Forest</option><option value="classic">Windows classic</option><option value="custom">Custom</option></select></label>
+<label class="field"><span>Page background</span><input id="pageColor" type="color" ></label>
+<label class="field"><span>Header / sidebar</span><input id="surfaceColor" type="color" ></label>
+<label class="field range-field"><span>UI opacity</span><input id="uiOpacity" type="range" min="0" max="100" step="1" value="30"><span class="measurement"><output id="uiOpacityValue" for="uiOpacity"></output><span>%</span></span></label>
+<label class="field range-field"><span>UI blur</span><input id="uiBlur" type="range" min="0" max="30" step="1" value="12" aria-describedby="uiBlurHint"><span class="measurement"><output id="uiBlurValue" for="uiBlur"></output><span>px</span></span></label>
+<p class="field-hint" id="uiBlurHint">Frosted glass: 0 px turns it off. Lower UI opacity reveals more of the background.</p>
+<label class="field"><span>Text</span><input id="textColor" type="color" ></label>
+<label class="field"><span>Accent</span><input id="accentColor" type="color" ></label>
+</div></fieldset>
+            <fieldset><legend>Wallpaper</legend><div class="field-list">
+<div class="field upload-field"><span id="backgroundImageLabel">Background image</span><div class="upload-actions" role="group" aria-labelledby="backgroundImageLabel"><button type="button" id="uploadBackground">Upload...</button><input id="backgroundImage" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/avif" aria-labelledby="backgroundImageLabel" hidden><button type="button" id="removeBackground" hidden>Remove</button></div></div>
+<label class="field"><span>Background</span><select id="backgroundMode"><option value="color">Solid color</option><option value="image">Image</option></select></label>
+<label class="field"><span>Image fit</span><select id="backgroundFit"><option value="cover">Fill screen</option><option value="contain">Fit image</option><option value="tile">Tile</option></select></label>
+<label class="field range-field"><span>Image opacity</span><input id="backgroundOpacity" type="range" min="0" max="100" value="40"><span class="measurement"><output id="backgroundOpacityValue" for="backgroundOpacity"></output><span>%</span></span></label>
+</div></fieldset>
+          </section>
+          <section id="player-panel" role="tabpanel" aria-labelledby="tab-player" tabindex="0" hidden>
+            <fieldset class="preview-group">
+              <legend>Preview</legend>
+              <div class="preview"><div class="preview-track">
+                <div class="preview-buffer"></div><div class="preview-progress"></div>
+                <div class="preview-thumb" aria-hidden="true"></div>
+              </div></div>
+            </fieldset>
+            <fieldset><legend>Progress bar</legend><div class="field-list">
+<label class="field"><span>Progress color</span><input id="progressColor" type="color" ></label>
+<label class="field"><span>Progress effect</span><select id="progressEffect"><option value="solid">Solid color</option><option value="pulse">Pulsing glow (animated)</option><option value="shimmer">Moving shimmer</option><option value="rainbow">Rainbow cycle</option></select></label>
+<label class="field"><span>Buffer color</span><input id="bufferColor" type="color" ></label>
+<label class="field range-field"><span>Bar thickness</span><input id="barHeight" type="range" min="3" max="14" value="5"><span class="measurement"><output id="barHeightValue" for="barHeight"></output><span>px</span></span></label>
+</div></fieldset>
+            <fieldset><legend>Scrubber icon</legend><div class="field-list">
+<label class="field"><span>Icon style</span><select id="thumbStyle"><option value="circle">Circle</option><option value="diamond">Diamond</option><option value="star">Star</option><option value="play">Play</option><option value="bolt">Lightning bolt</option><option value="heart">Heart</option><option value="custom">Custom image</option></select></label>
+<label class="field"><span>Icon color</span><input id="thumbColor" type="color" ></label>
+<label class="field range-field"><span>Icon size</span><input id="thumbSize" type="range" min="10" max="34" value="16"><span class="measurement"><output id="thumbSizeValue" for="thumbSize"></output><span>px</span></span></label>
+<div class="field upload-field"><span id="customIconLabel">Custom icon</span><div class="upload-actions" role="group" aria-labelledby="customIconLabel"><button type="button" id="uploadCustomIcon">Upload...</button><input id="customIcon" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/avif" aria-labelledby="customIconLabel" hidden><button type="button" id="removeCustomIcon" hidden>Remove</button></div></div>
+</div></fieldset>
+          </section>
+          <section id="layout-panel" role="tabpanel" aria-labelledby="tab-layout" tabindex="0" hidden>
+            <fieldset><legend>Video browsing</legend><div class="field-list">
+<label class="field"><span>Maximum videos per row</span><select id="videosPerRow"><option value="2">2 videos</option><option value="3">3 videos</option><option value="4">4 videos</option><option value="5">5 videos</option><option value="6">6 videos</option></select></label>
+<label class="check-field"><input type="checkbox" id="disableVideoPreviews" aria-describedby="disableVideoPreviewsHint"><span>Disable video previews</span></label>
+<p class="field-hint" id="disableVideoPreviewsHint">Keeps thumbnails still on Home, search results, and related videos.</p>
+<label class="check-field"><input type="checkbox" id="hideShorts"><span>Hide Shorts shelves and links</span></label>
+</div></fieldset>
+            <fieldset><legend>Header</legend><div class="field-list">
+<label class="check-field"><input type="checkbox" id="hideHomeTopicBar"><span>Hide topic filter bar</span></label>
+<label class="check-field"><input type="checkbox" id="hideCreateButton"><span>Hide Create button</span></label>
+<label class="check-field"><input type="checkbox" id="hideNotificationsButton"><span>Hide notifications button</span></label>
+</div></fieldset>
+            <fieldset><legend>Sidebar</legend><div class="field-list">
+<label class="check-field"><input type="checkbox" id="hideSidebarSubscriptions"><span>Hide Subscriptions section</span></label>
+<label class="check-field"><input type="checkbox" id="hideSidebarYou"><span>Hide You section</span></label>
+<label class="check-field"><input type="checkbox" id="hideSidebarExplore"><span>Hide Explore section</span></label>
+<label class="check-field"><input type="checkbox" id="hideSidebarMoreFromYouTube"><span>Hide More from YouTube</span></label>
+<label class="check-field"><input type="checkbox" id="hideSidebarReportHistory"><span>Hide Report history</span></label>
+</div></fieldset>
+            <fieldset><legend>Watch page</legend><div class="field-list">
+<label class="field range-field"><span>Related thumbnail width</span><input type="range" id="relatedThumbnailWidth" min="72" max="168" step="8" value="96"><span class="measurement"><output id="relatedThumbnailWidthValue" for="relatedThumbnailWidth"></output><span>px</span></span></label>
+<label class="check-field"><input type="checkbox" id="hideRelated"><span>Hide related videos</span></label>
+<label class="check-field"><input type="checkbox" id="hideComments"><span>Hide comments</span></label>
+<label class="check-field"><input type="checkbox" id="hideChat"><span>Hide live chat</span></label>
+</div></fieldset>
+            <fieldset><legend>Performance</legend><div class="field-list">
+<label class="check-field"><input type="checkbox" id="reduceAnimations"><span>Reduce motion</span></label>
+</div></fieldset>
+          </section>
+        </div>
+        <div class="actions">
+          <button type="button" id="reset">Reset tab</button>
+          <button type="button" id="resetAll">Reset all</button>
+          <button type="button" id="closePopup">Close</button>
+        </div>
+      </form>
+      <footer class="status-bar"><span id="status" role="status" aria-live="polite">Loading...</span></footer>
+    </main>
+    <script src="settings.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

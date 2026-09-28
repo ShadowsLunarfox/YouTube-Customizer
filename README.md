@@ -1,74 +1,104 @@
-# 🌸 YouTube Customizer
+<div align="center">
+  <img src="assets/logo.png" alt="YouTube Customizer logo" width="220">
+  <h1>🌸 YouTube Customizer</h1>
+  <p><strong>Make YouTube look and feel like your own.</strong></p>
+  <p>
+    <kbd>🧩 Manifest V3</kbd>
+    <kbd>🌐 Chrome</kbd>
+    <kbd>🌐 Microsoft Edge</kbd>
+    <kbd>🎨 Live preview</kbd>
+  </p>
+</div>
 
-<p align="center"><img src="assets/logo.png" alt="YouTube Customizer logo" width="180"></p>
+<hr>
 
-<!-- Project overview, feature reference, and usage guide. -->
+> Customize YouTube's appearance, player, and layout. Changes are previewed on the current YouTube tab as you adjust the settings.
 
-🌸 · ✿ · 🌸 · ✿ · 🌸
+## ✨ Features at a glance
 
-## 🌸 About
-
-YouTube Customizer is a browser extension for personalizing YouTube. It lets you restyle the page, customize the video progress bar, and hide or compact parts of YouTube's interface. The extension has an English settings UI with a Windows 98-inspired look, and changes are previewed on YouTube as you make them.
-
-## ✿ Features
+| Section | What you can customize |
+| --- | --- |
+| 🎨 **Appearance** | Page theme, colors, opacity, frosted glass, background images, and GIFs |
+| ▶️ **Player** | Progress and buffer colors, bar thickness, scrubber shape, and effects |
+| 🧩 **Layout** | Video grid, hover previews, Shorts, sidebar, comments, and live chat |
 
 ### 🎨 Appearance
 
-- Enable or disable a custom page theme, with Charcoal, Light, Forest, and Windows Classic presets.
-- Customize page, surface, text, and accent colors.
-- Set a shared UI opacity from 0% (transparent) to 100% (opaque).
-- Apply frosted glass to themed UI panels with the **UI blur** slider (0–30 px; 12 px by default). Set it to 0 px to turn blur off; lower UI opacity makes the blurred background more visible.
-- Upload a background image or GIF; choose Fill, Fit, or Tile and adjust its opacity.
-- YouTube ambient lighting is suppressed while a custom background is active and restored when it is no longer active.
+- Choose the **Charcoal**, **Light**, **Forest**, or **Windows Classic** theme, or set your own page, surface, text, and accent colors.
+- Adjust UI opacity from 0–100% and frosted-glass blur from 0–30 px.
+- Upload a background image or GIF, choose Fill, Fit, or Tile, and adjust its opacity.
+- YouTube ambient lighting is suppressed while a custom background is active.
 
 ### ▶️ Player
 
-- Change the progress and buffered-segment colors, progress-bar thickness, and scrubber size.
-- Choose a solid, pulsing glow, moving shimmer, or cycling rainbow progress effect.
-- Choose a built-in scrubber shape or upload a custom image/GIF.
+- Customize progress and buffered-segment colors, progress-bar thickness, and scrubber size.
+- Choose a solid color, pulsing glow, moving shimmer, or cycling rainbow effect.
+- Pick a built-in scrubber shape or upload a custom image or GIF.
 
-### 🧩 Layout
+### 🧩 Layout and browsing
 
-- Set the maximum number of videos per row from 2 to 6.
-- Disable hover previews on Home, search results, and related-video cards on the watch page, and reduce motion.
-- Hide Shorts shelves and links, the topic filter bar, the Create button, or the notifications button.
+- Set the Home video grid to 2–6 videos per row. Disable hover previews or reduce motion.
+- Hide Shorts, the topic filter bar, the Create button, or the notifications button.
 - Independently hide Subscriptions, You, Explore, More from YouTube, and Report history in the sidebar.
-- Adjust related-video thumbnail width from 72 to 168 pixels, or hide related videos entirely.
-- Hide comments or live chat.
+- Adjust related-video thumbnail width, or hide related videos, comments, or live chat.
 
-## 🌸 Installation
+## 🚀 Installation
 
-YouTube Customizer is a Manifest V3 extension for Chromium-based browsers such as Google Chrome and Microsoft Edge.
+YouTube Customizer is a Manifest V3 extension for Chromium-based browsers, including Google Chrome and Microsoft Edge.
 
-1. Download or clone this project to your computer.
-2. Open `chrome://extensions` in Chrome or `edge://extensions` in Edge.
+1. Download or clone this project and extract it to a folder on your computer.
+2. Open the extensions page: enter `chrome://extensions` in Chrome or `edge://extensions` in Edge.
 3. Turn on **Developer mode**.
 4. Select **Load unpacked**.
-5. Choose the project folder containing `manifest.json`.
-6. Open or refresh YouTube, then pin YouTube Customizer from the browser's Extensions menu for convenient access.
+5. Choose the project root folder containing `manifest.json`.
+6. Open YouTube. You can pin YouTube Customizer from the browser's Extensions menu for quick access.
 
-## ✿ Getting Started
+## 🪄 Getting started
 
-1. Open YouTube and click the YouTube Customizer icon in the browser toolbar.
-2. In **Appearance**, enable **Enable page theme** to customize YouTube's page colors. Choose a preset or set your own colors, opacity, and frosted-glass blur with **UI blur**.
-3. To use a wallpaper, select **Upload...**, choose an image or GIF, then set its fit and opacity.
-4. In **Player**, choose progress colors and an effect, then adjust the bar and scrubber. Select **Custom image** to use an uploaded scrubber image or GIF.
-5. In **Layout**, choose the video grid column limit and adjust the controls under **Video browsing**, **Header**, **Sidebar**, **Watch page**, and **Performance**. Each hide option works independently.
-6. Changes are applied to the current YouTube tab while you adjust settings. Reopen the popup to continue editing; use **Reset tab** or **Reset all** to restore defaults.
+1. Open YouTube and click the extension icon in the browser toolbar.
+2. In **Appearance**, enable **Enable page theme**, choose a theme, and adjust its colors, opacity, or blur.
+3. In **Wallpaper**, upload a background image. In **Player**, customize the progress bar and scrubber.
+4. In **Layout**, hide page elements or adjust the video layout as needed.
+5. Changes are previewed live and saved automatically. Use **Reset tab** to reset the current settings section, or **Reset all** to restore the default settings.
 
-## 🖼️ Image Uploads and Storage
+## 🖼️ Images and settings storage
 
-Backgrounds and custom scrubber images support PNG, JPEG, WebP, AVIF, and GIF. Each file must be no larger than 5 MB. GIF animation is preserved. Uploaded images are stored locally in the browser. Settings are saved with browser sync storage and may sync across browsers signed in to the same browser account.
+- Supported image formats: PNG, JPEG, WebP, AVIF, and GIF. Each image must be no larger than **5 MB**. GIF animation is preserved.
+- Theme and layout settings are stored in browser sync storage. Whether they sync across devices depends on your browser account's sync settings.
+- Uploaded backgrounds and custom scrubber images are stored locally in the current browser and do not sync with your settings.
 
 ## 🔄 Updating
 
-After changing the extension files, open the browser's extensions page and click the extension's reload button. Refresh any open YouTube tabs to load the updated content scripts.
+After changing or updating the project files, open the browser's extensions page and click the extension's **Reload** button. Then refresh any open YouTube tabs.
 
-## 🌸 Project Structure
+<details>
+  <summary>🛠️ Frequently asked questions</summary>
 
-- `assets/logo.png` is the original project logo; `icons/` contains the size-specific app icons derived from it.
-- `manifest.json` defines the extension metadata, permissions, and content scripts.
-- `settings.js` contains shared defaults, validation, and presets.
-- `popup.html`, `popup.css`, and `popup.js` implement the extension settings UI.
-- `yt.js` applies the player, appearance, and layout customizations on YouTube.
-- `content/` contains controllers for surfaces, homepage styling, and Shorts handling.
+  **Settings are not being applied to YouTube.**
+
+  Make sure the active tab is open to YouTube. After reloading the extension, refresh the YouTube page.
+
+  **My background image did not sync to another browser.**
+
+  Backgrounds and custom scrubber images are stored locally. Theme and layout settings are the items saved to browser sync storage.
+
+  **How do I undo my changes?**
+
+  Use **Reset tab** to reset the current settings section, or **Reset all** to restore all default settings.
+</details>
+
+## 📁 Project structure
+
+| File / folder | Purpose |
+| --- | --- |
+| `assets/logo.png` | Original project logo |
+| `icons/` | Extension icons derived from the logo at 16, 32, 48, and 128 px |
+| `manifest.json` | Extension metadata, icons, permissions, and content-script configuration |
+| `settings.js` | Default settings, validation, and theme presets |
+| `popup.html`, `popup.css`, `popup.js` | Extension settings popup |
+| `yt.js`, `content/` | YouTube page styling and feature controllers |
+| `tests/` | Regression and browser smoke-test scripts |
+
+<div align="center">
+  <sub>🌸 Add a little of your own style to YouTube.</sub>
+</div>

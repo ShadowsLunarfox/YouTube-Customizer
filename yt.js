@@ -22,6 +22,9 @@
   let backgroundVideo = null;
   let backgroundVideoData = "";
   let backgroundVideoUrl = "";
+  let backgroundImageLayer = null;
+  let backgroundImageData = "";
+  let backgroundImageUrl = "";
 
   // Current recommendation cards mount their hover player in a portal outside the thumbnail.
   // Use the same scopes for hiding preview UI and stopping its media, including animated images.
@@ -49,6 +52,50 @@
   function isDark(hex) {
     const [red, green, blue] = [1, 3, 5].map(start => parseInt(hex.slice(start, start + 2), 16));
     return red * 0.299 + green * 0.587 + blue * 0.114 < 145;
+  }
+
+  function createBackgroundUrl(data) {
+    const mime = data.slice(5, data.indexOf(";"));
+    const binary = atob(data.slice(data.indexOf(",") + 1));
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return URL.createObjectURL(new Blob([bytes], { type: mime }));
+  }
+
+  function removeBackgroundImage() {
+    backgroundImageLayer?.remove();
+    backgroundImageLayer = null;
+    if (backgroundImageUrl) URL.revokeObjectURL(backgroundImageUrl);
+    backgroundImageUrl = "";
+    backgroundImageData = "";
+  }
+
+  function syncBackgroundImage() {
+    const data = currentSettings.themeEnabled && currentSettings.backgroundMode === "image" &&
+      window === window.top && currentAssets.backgroundImageData.startsWith("data:image/")
+      ? currentAssets.backgroundImageData : "";
+    if (!data || !document.body) {
+      removeBackgroundImage();
+      return;
+    }
+    if (!backgroundImageLayer) {
+      backgroundImageLayer = document.createElement("div");
+      backgroundImageLayer.id = "ytc-background-image";
+      backgroundImageLayer.setAttribute("aria-hidden", "true");
+    }
+    if (backgroundImageData !== data) {
+      try {
+        const url = createBackgroundUrl(data);
+        backgroundImageLayer.style.backgroundImage = `url("${url}")`;
+        if (backgroundImageUrl) URL.revokeObjectURL(backgroundImageUrl);
+        backgroundImageUrl = url;
+        backgroundImageData = data;
+      } catch {
+        removeBackgroundImage();
+        return;
+      }
+    }
+    if (!backgroundImageLayer.isConnected) document.body.prepend(backgroundImageLayer);
   }
 
   function removeBackgroundVideo() {
@@ -92,10 +139,7 @@
     backgroundVideo.volume = 0;
     if (backgroundVideoData !== data) {
       try {
-        const binary = atob(data.slice(data.indexOf(",") + 1));
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-        const url = URL.createObjectURL(new Blob([bytes], { type: "video/mp4" }));
+        const url = createBackgroundUrl(data);
         backgroundVideo.src = url;
         if (backgroundVideoUrl) URL.revokeObjectURL(backgroundVideoUrl);
         backgroundVideoUrl = url;
@@ -199,7 +243,7 @@
     const { pageColor: page, surfaceColor: surface, textColor: text, accentColor: accent } = settings;
     const videoWallpaper = settings.backgroundMode === "image" &&
       assets.backgroundImageData.startsWith("data:video/mp4;");
-    const wallpaper = settings.backgroundMode === "image" && assets.backgroundImageData && !videoWallpaper;
+    const wallpaper = settings.backgroundMode === "image" && backgroundImageUrl && !videoWallpaper;
     const panel = "var(--ytc-ui-background)";
     const chatPanel = panel;
     const navigationPanel = panel;
@@ -207,7 +251,7 @@
     const controlFill = rgba(text, "var(--ytc-ui-opacity)");
     const muted = "color-mix(in srgb, " + text + " 70%, " + surface + ")";
     const shade = rgba(page, 1 - settings.backgroundOpacity / 100);
-    const image = wallpaper ? 'linear-gradient(' + shade + ', ' + shade + '), url("' + assets.backgroundImageData + '")' : "none";
+    const image = wallpaper ? 'linear-gradient(' + shade + ', ' + shade + '), url("' + backgroundImageUrl + '")' : "none";
     const fit = settings.backgroundFit === "tile" ? "auto" : settings.backgroundFit;
     const repeat = settings.backgroundFit === "tile" ? "repeat" : "no-repeat";
     return `
@@ -244,11 +288,7 @@
         --ytc-universal-glass: ${universalGlass} !important;
         color-scheme: ${isDark(page) ? "dark" : "light"} !important;
         background-color: ${page} !important;
-        background-image: ${image} !important;
-        background-position: center center !important;
-        background-size: ${fit} !important;
-        background-repeat: ${repeat} !important;
-        background-attachment: fixed !important;
+        background-image: none !important;
       }
 
       html[data-ytc-theme][data-ytc-chat-frame] {
@@ -271,6 +311,20 @@
         max-width: none !important;
         object-fit: ${settings.backgroundFit === "contain" ? "contain" : "cover"} !important;
         object-position: center !important;
+        opacity: ${settings.backgroundOpacity / 100} !important;
+        z-index: -1 !important;
+        pointer-events: none !important;
+      }
+
+      html[data-ytc-theme] body > #ytc-background-image {
+        display: block !important;
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        background-position: center center !important;
+        background-size: ${fit} !important;
+        background-repeat: ${repeat} !important;
         opacity: ${settings.backgroundOpacity / 100} !important;
         z-index: -1 !important;
         pointer-events: none !important;
@@ -710,12 +764,13 @@
       styleEl.id = "yt-custom-progress-style";
     }
     if (!styleEl.isConnected) document.documentElement.appendChild(styleEl);
+    syncBackgroundImage();
+    syncBackgroundVideo();
     const css = buildPlayerCss(currentSettings, currentAssets.customIconData) +
       buildAppearanceCss(currentSettings, currentAssets) +
       (runtime.buildHomepageGlassCss?.() || "") + (runtime.buildSurfaceCss?.() || "") + buildLayoutCss(currentSettings) +
       buildEffectsCss(currentSettings) + buildGridCss(currentSettings);
     if (styleEl.textContent !== css) styleEl.textContent = css;
-    syncBackgroundVideo();
     document.documentElement.toggleAttribute("data-ytc-reduced-effects", currentSettings.reduceAnimations);
     document.documentElement.toggleAttribute("data-ytc-disable-video-previews", currentSettings.disableVideoPreviews);
     stopActiveThumbnailPreviews();
@@ -811,6 +866,7 @@
   PREVIEW_MEDIA_EVENTS.forEach(event => document.addEventListener(event, stopThumbnailPreview, true));
   const observer = new MutationObserver(records => {
     if (!styleEl?.isConnected) applyStyles(currentSettings);
+    if (backgroundImageLayer && !backgroundImageLayer.isConnected) syncBackgroundImage();
     if (backgroundVideo && !backgroundVideo.isConnected) syncBackgroundVideo();
     if (records.some(record => {
       if (record.type !== "childList") return false;
@@ -853,6 +909,7 @@
       window.removeEventListener("popstate", shorts.sync);
       window.removeEventListener("resize", shorts.schedule);
       document.removeEventListener("visibilitychange", syncBackgroundVideo);
+      removeBackgroundImage();
       removeBackgroundVideo();
       chrome.storage.onChanged.removeListener(onStorageChanged);
       chrome.runtime.onMessage.removeListener(onMessage);

@@ -29,6 +29,8 @@ let lastSentAssets = {};
 let applicationError = "";
 let initialized = false;
 let previewVideoData = "";
+let previewImageData = "";
+let previewImageUrl = "";
 
 function silenceVideo(video) {
   video.defaultMuted = true;
@@ -78,8 +80,22 @@ function updatePreview() {
   const withImage = settings.themeEnabled && settings.backgroundMode === "image" &&
     assets.backgroundImageData && !videoBackground;
   const withVideo = settings.themeEnabled && settings.backgroundMode === "image" && videoBackground;
-  themePreview.style.backgroundImage = withImage
-    ? 'linear-gradient(color-mix(in srgb, ' + settings.pageColor + ' ' + (100 - settings.backgroundOpacity) + '%, transparent), color-mix(in srgb, ' + settings.pageColor + ' ' + (100 - settings.backgroundOpacity) + '%, transparent)), url("' + assets.backgroundImageData + '")'
+  if (withImage && previewImageData !== assets.backgroundImageData) {
+    const data = assets.backgroundImageData;
+    const binary = atob(data.slice(data.indexOf(",") + 1));
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([bytes], { type: data.slice(5, data.indexOf(";")) }));
+    if (previewImageUrl) URL.revokeObjectURL(previewImageUrl);
+    previewImageUrl = url;
+    previewImageData = data;
+  } else if (!withImage && previewImageUrl) {
+    URL.revokeObjectURL(previewImageUrl);
+    previewImageUrl = "";
+    previewImageData = "";
+  }
+  themePreview.style.backgroundImage = withImage && previewImageUrl
+    ? 'linear-gradient(color-mix(in srgb, ' + settings.pageColor + ' ' + (100 - settings.backgroundOpacity) + '%, transparent), color-mix(in srgb, ' + settings.pageColor + ' ' + (100 - settings.backgroundOpacity) + '%, transparent)), url("' + previewImageUrl + '")'
     : "none";
   themePreview.style.backgroundSize = settings.backgroundFit === "tile" ? "auto, 32px" : settings.backgroundFit;
   themePreview.style.backgroundRepeat = settings.backgroundFit === "tile" ? "repeat" : "no-repeat";
@@ -114,6 +130,10 @@ function updatePreview() {
     fields[key].disabled = !assets.backgroundImageData || settings.backgroundMode !== "image";
   }
 }
+
+window.addEventListener("pagehide", () => {
+  if (previewImageUrl) URL.revokeObjectURL(previewImageUrl);
+});
 
 function showStatus(message = "Saved", isError = false) {
   clearTimeout(statusTimer);

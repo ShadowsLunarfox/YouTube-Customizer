@@ -102,7 +102,7 @@
   }
 
   globalThis.YTCustomizer = Object.freeze({
-    version: "76", defaults, assetDefaults, presets, tabKeys, normalize, normalizeAssets,
+    version: "77", defaults, assetDefaults, presets, tabKeys, normalize, normalizeAssets,
     isImageData, isBackgroundData, iconDataUri
   });
 })();

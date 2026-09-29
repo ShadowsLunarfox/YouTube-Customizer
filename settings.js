@@ -82,7 +82,7 @@
   }
 
   function isBackgroundData(value) {
-    return typeof value === "string" && value.length <= 4 * Math.ceil(10 * 1024 * 1024 / 3) + 32 &&
+    return typeof value === "string" && value.length <= 4 * Math.ceil(20 * 1024 * 1024 / 3) + 32 &&
       /^data:(?:image\/(?:png|jpeg|webp|gif|avif)|video\/mp4);base64,[a-z0-9+/]+={0,2}$/i.test(value);
   }
 
@@ -102,7 +102,7 @@
   }
 
   globalThis.YTCustomizer = Object.freeze({
-    version: "77", defaults, assetDefaults, presets, tabKeys, normalize, normalizeAssets,
+    version: "78", defaults, assetDefaults, presets, tabKeys, normalize, normalizeAssets,
     isImageData, isBackgroundData, iconDataUri
   });
 })();

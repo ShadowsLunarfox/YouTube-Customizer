@@ -275,9 +275,9 @@ function readAsset(file, key) {
     if (!video && !/^image\/(png|jpeg|webp|gif|avif)$/.test(file.type)) {
       return reject(new Error(background ? "Choose a PNG, JPEG, WebP, GIF, AVIF, or MP4 file" : "Unsupported image format"));
     }
-    const limit = (background ? 10 : 5) * 1024 * 1024;
+    const limit = (background ? 20 : 5) * 1024 * 1024;
     if (!file.size || file.size > limit) {
-      return reject(new Error(`Choose a file no larger than ${background ? 10 : 5} MB`));
+      return reject(new Error(`Choose a file no larger than ${background ? 20 : 5} MB`));
     }
     const reader = new FileReader();
     reader.onerror = () => reject(new Error("Could not read file"));

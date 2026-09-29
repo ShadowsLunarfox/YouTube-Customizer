@@ -26,7 +26,7 @@
 
 - Choose the **Charcoal**, **Light**, **Forest**, or **Windows Classic** theme, or set your own page, surface, text, and accent colors.
 - Adjust UI opacity from 0–100% and frosted-glass blur from 0–30 px.
-- Upload a background image, GIF, or MP4 video up to 10 MB, choose Fill or Fit, and adjust its opacity. Images can also be tiled. MP4 videos loop silently.
+- Upload a background image, GIF, or MP4 video up to 20 MB, choose Fill or Fit, and adjust its opacity. Images can also be tiled. MP4 videos loop silently.
 - YouTube ambient lighting is suppressed while a custom background is active.
 
 ### ▶️ Player
@@ -63,9 +63,9 @@ YouTube Customizer is a Manifest V3 extension for Chromium-based browsers, inclu
 
 ## 🖼️ Backgrounds and settings storage
 
-- Backgrounds support PNG, JPEG, WebP, AVIF, GIF, and MP4 up to **10 MB** per file. GIF animation is preserved; MP4 videos loop with sound permanently muted.
+- Backgrounds support PNG, JPEG, WebP, AVIF, GIF, and MP4 up to **20 MB** per file. GIF animation is preserved; MP4 videos loop with sound permanently muted.
 - Custom scrubber icons support PNG, JPEG, WebP, AVIF, and GIF up to **5 MB**.
-- The `unlimitedStorage` permission lets the extension save 10 MB backgrounds after they are encoded for browser storage.
+- The `unlimitedStorage` permission lets the extension save 20 MB backgrounds after they are encoded for browser storage.
 - Theme and layout settings are stored in browser sync storage. Whether they sync across devices depends on your browser account's sync settings.
 - Uploaded backgrounds and custom scrubber images are stored locally in the current browser and do not sync with your settings.
 

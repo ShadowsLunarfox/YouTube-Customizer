@@ -19,6 +19,9 @@
   let disposed = false;
   let stylesApplied = false;
   let sidebarTimer = 0;
+  let backgroundVideo = null;
+  let backgroundVideoData = "";
+  let backgroundVideoUrl = "";
 
   // Current recommendation cards mount their hover player in a portal outside the thumbnail.
   // Use the same scopes for hiding preview UI and stopping its media, including animated images.
@@ -46,6 +49,65 @@
   function isDark(hex) {
     const [red, green, blue] = [1, 3, 5].map(start => parseInt(hex.slice(start, start + 2), 16));
     return red * 0.299 + green * 0.587 + blue * 0.114 < 145;
+  }
+
+  function removeBackgroundVideo() {
+    if (backgroundVideo) {
+      backgroundVideo.pause();
+      backgroundVideo.removeAttribute("src");
+      backgroundVideo.load();
+      backgroundVideo.remove();
+      backgroundVideo = null;
+    }
+    if (backgroundVideoUrl) URL.revokeObjectURL(backgroundVideoUrl);
+    backgroundVideoUrl = "";
+    backgroundVideoData = "";
+  }
+
+  function syncBackgroundVideo() {
+    const data = currentSettings.themeEnabled && currentSettings.backgroundMode === "image" &&
+      window === window.top && currentAssets.backgroundImageData.startsWith("data:video/mp4;")
+      ? currentAssets.backgroundImageData : "";
+    if (!data || !document.body) {
+      removeBackgroundVideo();
+      return;
+    }
+    if (!backgroundVideo) {
+      backgroundVideo = document.createElement("video");
+      backgroundVideo.id = "ytc-background-video";
+      backgroundVideo.autoplay = true;
+      backgroundVideo.loop = true;
+      backgroundVideo.playsInline = true;
+      backgroundVideo.setAttribute("aria-hidden", "true");
+      backgroundVideo.addEventListener("volumechange", () => {
+        if (backgroundVideo) {
+          backgroundVideo.defaultMuted = true;
+          backgroundVideo.muted = true;
+          backgroundVideo.volume = 0;
+        }
+      });
+    }
+    backgroundVideo.defaultMuted = true;
+    backgroundVideo.muted = true;
+    backgroundVideo.volume = 0;
+    if (backgroundVideoData !== data) {
+      try {
+        const binary = atob(data.slice(data.indexOf(",") + 1));
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const url = URL.createObjectURL(new Blob([bytes], { type: "video/mp4" }));
+        backgroundVideo.src = url;
+        if (backgroundVideoUrl) URL.revokeObjectURL(backgroundVideoUrl);
+        backgroundVideoUrl = url;
+        backgroundVideoData = data;
+      } catch {
+        removeBackgroundVideo();
+        return;
+      }
+    }
+    if (!backgroundVideo.isConnected) document.body.prepend(backgroundVideo);
+    if (document.hidden) backgroundVideo.pause();
+    else if (backgroundVideo.paused) void backgroundVideo.play().catch(() => {});
   }
 
   function buildPlayerCss(settings, customIconData) {
@@ -135,7 +197,9 @@
   function buildAppearanceCss(settings, assets) {
     if (!settings.themeEnabled) return "";
     const { pageColor: page, surfaceColor: surface, textColor: text, accentColor: accent } = settings;
-    const wallpaper = settings.backgroundMode === "image" && assets.backgroundImageData;
+    const videoWallpaper = settings.backgroundMode === "image" &&
+      assets.backgroundImageData.startsWith("data:video/mp4;");
+    const wallpaper = settings.backgroundMode === "image" && assets.backgroundImageData && !videoWallpaper;
     const panel = "var(--ytc-ui-background)";
     const chatPanel = panel;
     const navigationPanel = panel;
@@ -196,6 +260,20 @@
         ytd-watch-flexy, ytd-rich-grid-renderer, ytd-two-column-browse-results-renderer) {
         background: transparent !important;
         color: ${text} !important;
+      }
+
+      html[data-ytc-theme] body > #ytc-background-video {
+        display: block !important;
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        max-width: none !important;
+        object-fit: ${settings.backgroundFit === "contain" ? "contain" : "cover"} !important;
+        object-position: center !important;
+        opacity: ${settings.backgroundOpacity / 100} !important;
+        z-index: -1 !important;
+        pointer-events: none !important;
       }
 
       html[data-ytc-theme] :is(ytd-masthead, ytd-mini-guide-renderer, ytd-guide-renderer) {
@@ -273,7 +351,8 @@
       html[data-ytc-theme] :is(ytd-masthead yt-icon-button, ytd-masthead yt-icon,
         ytd-guide-renderer yt-icon, ytd-mini-guide-renderer yt-icon, yt-searchbox) { color: ${text} !important; }
       html[data-ytc-theme] ytd-topbar-logo-renderer [id^="youtube-paths"] { fill: ${text} !important; }
-      html[data-ytc-theme] :is(.ytSearchboxComponentInputContainer, .ytSearchboxComponentInputBox,
+      html[data-ytc-theme] :is(.ytSearchboxComponentInputBox,
+        .ytSearchboxComponentInputContainerUnified.ytSearchboxComponentInputContainerIsFocused,
         .ytSearchboxComponentSearchButton, .ytSearchboxComponentSuggestionsContainer) {
         background-color: ${panel} !important;
         color: ${text} !important;
@@ -288,6 +367,10 @@
       }
       html[data-ytc-theme] :is(ytd-masthead, ytd-watch-metadata, ytd-comments)
         .ytSpecButtonShapeNextOutline { color: ${accent} !important; border-color: ${rgba(text, 0.3)} !important; }
+      html[data-ytc-theme] :is(ytd-subscribe-button-renderer, ytd-grid-channel-renderer #subscribe)
+        :is(.ytSpecButtonShapeNextHost, .ytSpecButtonShapeNextButtonTextContent) {
+        color: ${text} !important;
+      }
       html[data-ytc-theme] :is(ytd-watch-metadata #description a, ytd-comments #content-text a) { color: ${accent} !important; }
       html[data-ytc-theme] yt-chip-cloud-chip-renderer[selected] {
         --ytc-universal-glass: ${rgba(accent, "var(--ytc-ui-opacity)")} !important;
@@ -384,7 +467,7 @@
         display: block !important;
         z-index: 2 !important;
         pointer-events: none !important;
-        background-color: ${page} !important;
+        background-color: ${videoWallpaper ? "transparent" : page} !important;
         background-image: ${image} !important;
         background-position: center center !important;
         background-size: ${fit} !important;
@@ -488,19 +571,55 @@
   }
 
   function buildGridCss(settings) {
+    // Shorts shelves size cards independently of the regular rich-grid columns.
+    const shortsShelf = "html body grid-shelf-view-model:has(ytm-shorts-lockup-view-model, ytm-shorts-lockup-view-model-v2)";
+    const legacyShorts = "html body ytd-rich-shelf-renderer[is-shorts] > #dismissible > #contents-container > #contents";
+    const shortsGap = 16;
     return `
-      @media (min-width: 1024px) {
+      html body ytd-rich-grid-renderer,
+      html body ytd-rich-grid-renderer #contents {
+        --ytc-grid-columns: ${settings.videosPerRow};
+        --ytd-rich-grid-items-per-row: var(--ytc-grid-columns) !important;
+        --ytd-rich-grid-posts-per-row: var(--ytc-grid-columns) !important;
+        --ytd-rich-grid-slim-items-per-row: var(--ytc-grid-columns) !important;
+        --ytd-rich-grid-game-cards-per-row: var(--ytc-grid-columns) !important;
+        --ytd-rich-grid-mini-game-cards-per-row: var(--ytc-grid-columns) !important;
+        --ytd-rich-grid-channel-items-per-row: var(--ytc-grid-columns) !important;
+        --ytd-rich-grid-item-min-width: 0px !important;
+        --ytd-rich-grid-item-margin: 12px !important;
+      }
+      /* Keep the column count within the setting without shrinking cards on narrow windows. */
+      @media (max-width: 1023px) {
         html body ytd-rich-grid-renderer,
         html body ytd-rich-grid-renderer #contents {
-          --ytd-rich-grid-items-per-row: ${settings.videosPerRow} !important;
-          --ytd-rich-grid-posts-per-row: ${settings.videosPerRow} !important;
-          --ytd-rich-grid-slim-items-per-row: ${settings.videosPerRow} !important;
-          --ytd-rich-grid-game-cards-per-row: ${settings.videosPerRow} !important;
-          --ytd-rich-grid-mini-game-cards-per-row: ${settings.videosPerRow} !important;
-          --ytd-rich-grid-channel-items-per-row: ${settings.videosPerRow} !important;
-          --ytd-rich-grid-item-min-width: 0px !important;
-          --ytd-rich-grid-item-margin: 12px !important;
+          --ytc-grid-columns: ${Math.min(settings.videosPerRow, 3)};
         }
+      }
+      @media (max-width: 799px) {
+        html body ytd-rich-grid-renderer,
+        html body ytd-rich-grid-renderer #contents {
+          --ytc-grid-columns: ${Math.min(settings.videosPerRow, 2)};
+        }
+      }
+      @media (max-width: 479px) {
+        html body ytd-rich-grid-renderer,
+        html body ytd-rich-grid-renderer #contents {
+          --ytc-grid-columns: 1;
+        }
+      }
+      ${shortsShelf} .ytGridShelfViewModelGridShelfRow,
+      ${legacyShorts} {
+        display: grid !important;
+        grid-template-columns: repeat(auto-fit, minmax(max(180px,
+          calc((100% - ${shortsGap * (settings.videosPerRow - 1)}px) / ${settings.videosPerRow})), 1fr)) !important;
+        gap: ${shortsGap}px !important;
+      }
+      ${shortsShelf} .ytGridShelfViewModelGridShelfItem,
+      ${legacyShorts} > ytd-rich-item-renderer {
+        width: auto !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        margin-inline: 0 !important;
       }
     `;
   }
@@ -596,6 +715,7 @@
       (runtime.buildHomepageGlassCss?.() || "") + (runtime.buildSurfaceCss?.() || "") + buildLayoutCss(currentSettings) +
       buildEffectsCss(currentSettings) + buildGridCss(currentSettings);
     if (styleEl.textContent !== css) styleEl.textContent = css;
+    syncBackgroundVideo();
     document.documentElement.toggleAttribute("data-ytc-reduced-effects", currentSettings.reduceAnimations);
     document.documentElement.toggleAttribute("data-ytc-disable-video-previews", currentSettings.disableVideoPreviews);
     stopActiveThumbnailPreviews();
@@ -691,6 +811,7 @@
   PREVIEW_MEDIA_EVENTS.forEach(event => document.addEventListener(event, stopThumbnailPreview, true));
   const observer = new MutationObserver(records => {
     if (!styleEl?.isConnected) applyStyles(currentSettings);
+    if (backgroundVideo && !backgroundVideo.isConnected) syncBackgroundVideo();
     if (records.some(record => {
       if (record.type !== "childList") return false;
       const target = record.target instanceof Element ? record.target : record.target.parentElement;
@@ -716,6 +837,7 @@
   window.addEventListener("popstate", surfaces.apply);
   window.addEventListener("popstate", shorts.sync);
   window.addEventListener("resize", shorts.schedule);
+  document.addEventListener("visibilitychange", syncBackgroundVideo);
 
   globalThis[INSTANCE_KEY] = {
     version: SCRIPT_VERSION,
@@ -730,6 +852,8 @@
       window.removeEventListener("popstate", surfaces.apply);
       window.removeEventListener("popstate", shorts.sync);
       window.removeEventListener("resize", shorts.schedule);
+      document.removeEventListener("visibilitychange", syncBackgroundVideo);
+      removeBackgroundVideo();
       chrome.storage.onChanged.removeListener(onStorageChanged);
       chrome.runtime.onMessage.removeListener(onMessage);
       PREVIEW_MEDIA_EVENTS.forEach(event => document.removeEventListener(event, stopThumbnailPreview, true));

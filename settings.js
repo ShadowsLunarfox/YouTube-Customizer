@@ -81,8 +81,16 @@
       /^data:image\/(?:png|jpeg|webp|gif|avif);base64,[a-z0-9+/]+={0,2}$/i.test(value);
   }
 
+  function isBackgroundData(value) {
+    return typeof value === "string" && value.length <= 4 * Math.ceil(10 * 1024 * 1024 / 3) + 32 &&
+      /^data:(?:image\/(?:png|jpeg|webp|gif|avif)|video\/mp4);base64,[a-z0-9+/]+={0,2}$/i.test(value);
+  }
+
   function normalizeAssets(assets = {}) {
-    return Object.fromEntries(Object.keys(assetDefaults).map(key => [key, isImageData(assets[key]) ? assets[key] : ""]));
+    return {
+      customIconData: isImageData(assets.customIconData) ? assets.customIconData : "",
+      backgroundImageData: isBackgroundData(assets.backgroundImageData) ? assets.backgroundImageData : ""
+    };
   }
 
   function iconDataUri(style, color, customIconData = "") {
@@ -94,6 +102,7 @@
   }
 
   globalThis.YTCustomizer = Object.freeze({
-    version: "68", defaults, assetDefaults, presets, tabKeys, normalize, normalizeAssets, isImageData, iconDataUri
+    version: "76", defaults, assetDefaults, presets, tabKeys, normalize, normalizeAssets,
+    isImageData, isBackgroundData, iconDataUri
   });
 })();

@@ -7,19 +7,24 @@
   const UNIVERSAL_GLASS_ATTR = "data-ytc-universal-glass";
   const UNIVERSAL_GLASS_CLEAR_ATTR = "data-ytc-universal-clear";
   const GLASS_BACKDROP = "var(--ytc-ui-backdrop)";
-  // An iframe cannot sample the parent document's wallpaper; frost its outer frame as well.
-  const FRAME_BACKDROP_SELECTOR = "ytd-live-chat-frame";
-  const SEARCH_SUGGESTION_SELECTOR = ".ytSearchboxComponentSuggestionsContainer, ytd-searchbox #suggestions";
+  const MASTHEAD_BACKDROP_SELECTOR = "ytd-masthead > #background";
+  // Frost the header's background sibling so autocomplete can still sample the page.
+  // An iframe also needs its outer frame to sample the parent document's wallpaper.
+  const FROSTED_WRAPPER_SELECTOR = "ytd-live-chat-frame, " + MASTHEAD_BACKDROP_SELECTOR;
+  // The classic input's 32px left margin belongs to a clear layout wrapper.
+  // Unified search instead paints its rounded outer container while expanded.
+  const SEARCH_UNIFIED_SURFACE_SELECTOR = ".ytSearchboxComponentInputContainerUnified.ytSearchboxComponentInputContainerIsFocused";
   const NAVIGATION_BACKDROP_SELECTOR = [
     "ytd-app #frosted-glass", "ytd-app #masthead-container", "ytd-masthead #background",
     "ytd-feed-filter-chip-bar-renderer", "ytd-feed-filter-chip-bar-renderer #chips-wrapper"
   ].join(",");
-  // Current Save-to menus paint their background on the contextual layout inside the sheet.
-  // Keep a single tinted panel, including when YouTube nests multiple dialog components.
+  // Give each popup one tinted outer panel; nested dialog layouts stay clear.
   const DIALOG_SURFACE_SELECTORS = [
     "tp-yt-paper-dialog", "[role='dialog']", "yt-dialog-view-model", "yt-sheet-view-model",
     ".ytDialogViewModelHost", ".ytSheetViewModelHost", ".ytContextualSheetLayoutHost",
-    ".ytSpecDialogLayoutHost", ".ytSpecBottomSheetLayoutContainer", "ytd-add-to-playlist-renderer"
+    ".ytSpecDialogLayoutHost", ".ytSpecBottomSheetLayoutContainer", "ytd-add-to-playlist-renderer",
+    "ytd-voice-search-dialog-renderer", "ytd-report-form-modal-renderer",
+    "ytd-download-quality-selector-renderer"
   ];
   const DIALOG_SURFACE_SELECTOR = DIALOG_SURFACE_SELECTORS.join(",");
   const DIALOG_CONTENT_SELECTOR = `:is(${DIALOG_SURFACE_SELECTOR}) :is(
@@ -27,7 +32,16 @@
     .ytContextualSheetLayoutFooterContainer, .ytSpecDialogLayoutContainer,
     .ytSpecDialogLayoutContent, .ytSpecDialogLayoutContentInner, .ytSpecDialogLayoutFooterContainer,
     .ytSpecBottomSheetLayoutHeaderWrapper, .ytSpecBottomSheetLayoutContentWrapper,
-    .ytSpecBottomSheetLayoutFooterWrapper, yt-list-view-model, .ytListViewModelHost)`;
+    .ytSpecBottomSheetLayoutFooterWrapper, yt-list-view-model, .ytListViewModelHost,
+    ytd-flow-root-renderer, ytd-flow-step-renderer,
+    ytd-flow-root-renderer #content, ytd-flow-step-renderer #content,
+    ytd-engagement-panel-section-list-renderer #content,
+    ytd-download-quality-selector-content,
+    ytd-download-quality-selector-content :is(#quality-options, #upsell-section),
+    ytd-download-quality-selector-renderer .buttons,
+    :is(ytd-voice-search-dialog-renderer, ytd-report-form-modal-renderer,
+      ytd-download-quality-selector-renderer) :is(#voice-search-dialog, #dialog, #download-dialog,
+      #report-form, #content, #contents, #container))`;
   const BACKDROP_RESET_SELECTOR = NAVIGATION_BACKDROP_SELECTOR + "," + DIALOG_SURFACE_SELECTOR;
   const UNIVERSAL_GLASS_TARGET_SELECTORS = [
     "ytd-masthead", "ytd-masthead #background", "ytd-masthead #masthead-container",
@@ -43,13 +57,13 @@
     "ytd-comments", "ytd-watch-next-secondary-results-renderer", "ytd-playlist-panel-renderer",
     "ytd-playlist-sidebar-renderer", "ytd-live-chat-frame", "yt-live-chat-renderer",
     "ytd-menu-popup-renderer", "ytd-multi-page-menu-renderer", ...DIALOG_SURFACE_SELECTORS,
-    "ytd-voice-search-dialog-renderer", "ytd-voice-search-dialog-renderer #voice-search-dialog",
+    "ytd-voice-search-dialog-renderer #voice-search-dialog",
     "ytd-tabbed-page-header", "ytd-c4-tabbed-header-renderer", "ytd-playlist-header-renderer",
     "yt-page-header-renderer", "yt-page-header-view-model",
     ".ytp-popup", ".ytp-tooltip-text", "tp-yt-paper-tooltip #tooltip",
     "tp-yt-app-drawer #contentContainer", "ytd-engagement-panel-section-list-renderer #content",
     "ytd-masthead #search", "ytd-masthead #center", "ytd-masthead #container", "yt-searchbox",
-    ".ytSearchboxComponentInputContainer", ".ytSearchboxComponentInputBox",
+    SEARCH_UNIFIED_SURFACE_SELECTOR, ".ytSearchboxComponentInputBox",
     ".ytSearchboxComponentSearchButton", ".ytSearchboxComponentSuggestionsContainer",
     "ytd-searchbox #suggestions"
   ];
@@ -60,10 +74,14 @@
     "ytd-masthead #masthead-container", "ytd-masthead #search", "ytd-masthead yt-searchbox",
     "ytd-guide-renderer #guide", "ytd-guide-renderer #guide-inner-content", "ytd-guide-renderer #sections",
     "ytd-guide-renderer #footer", "ytd-mini-guide-renderer #guide-content", "ytd-mini-guide-renderer #items",
+    "ytd-multi-page-menu-renderer > #header",
+    "ytd-multi-page-menu-renderer > #header ytd-simple-menu-header-renderer",
     "ytd-feed-filter-chip-bar-renderer:has(#chips-wrapper)", "ytd-feed-filter-chip-bar-renderer yt-chip-cloud-renderer",
     "yt-chip-cloud-chip-renderer #chip-container", "yt-chip-cloud-chip-renderer .ytChipShapeChip",
     "ytd-rich-item-renderer yt-lockup-view-model",
-    ".ytSpecTouchFeedbackShapeFill", ".ytSearchboxComponentInputBox", "ytd-rich-section-renderer",
+    ".ytSpecTouchFeedbackShapeFill", "ytd-rich-section-renderer",
+    `.ytSearchboxComponentInputContainer:not(${SEARCH_UNIFIED_SURFACE_SELECTOR})`,
+    `${SEARCH_UNIFIED_SURFACE_SELECTOR} :is(.ytSearchboxComponentInputBox, .ytSearchboxComponentSearchButton)`,
     "tp-yt-app-drawer #contentContainer", "ytd-live-chat-frame", "ytd-live-chat-frame #chat",
     "ytd-live-chat-frame iframe", "yt-live-chat-app", "yt-live-chat-app > #contents",
     "yt-live-chat-renderer #contents", "yt-live-chat-renderer #chat-messages", "yt-live-chat-renderer #chat",
@@ -101,7 +119,7 @@
   const GLASS_UPDATE_SELECTOR = [UNIVERSAL_GLASS_TARGET_SELECTOR, UNIVERSAL_GLASS_CLEAR_SELECTOR,
     `[${UNIVERSAL_GLASS_ATTR}]`, `[${UNIVERSAL_GLASS_CLEAR_ATTR}]`].join(",");
   // Controls inside a frosted panel can use its blurred background without a second backdrop filter.
-  // The masthead is excluded because opening search suggestions temporarily removes its blur.
+  // Search controls keep their own blur; the masthead backdrop lives on a sibling layer.
   const SHARED_BACKDROP_SELECTOR = `:is(ytd-comments, ytd-watch-metadata #description,
     ytd-watch-next-secondary-results-renderer, ytd-playlist-panel-renderer, ytd-playlist-sidebar-renderer,
     ytd-rich-item-renderer, ytd-video-renderer, yt-lockup-view-model,
@@ -191,19 +209,9 @@
       }
     }
 
-    function searchSuggestionsVisible(masthead) {
-      return [...masthead.querySelectorAll(SEARCH_SUGGESTION_SELECTOR)].some(element => {
-        const style = getComputedStyle(element);
-        const bounds = element.getBoundingClientRect();
-        return style.display !== "none" && style.visibility !== "hidden" && Number(style.opacity) > 0 &&
-          bounds.width > 0 && bounds.height > 0;
-      });
-    }
-
     function surfaceBackdrop(element, color) {
-      if (element.matches(FRAME_BACKDROP_SELECTOR)) return GLASS_BACKDROP;
-      // Let an open autocomplete panel sample the page behind the header instead of the header's backdrop root.
-      if (element.matches("ytd-masthead") && searchSuggestionsVisible(element)) return "none";
+      if (element.matches(FROSTED_WRAPPER_SELECTOR)) return GLASS_BACKDROP;
+      if (element.matches("ytd-masthead:has(> #background)")) return "none";
       if (element.matches(SHARED_BACKDROP_SELECTOR)) return "none";
       return color !== "transparent" ? GLASS_BACKDROP : "none";
     }
@@ -215,6 +223,11 @@
       forceStyle(store, element, "background", color);
       forceStyle(store, element, "box-shadow", "none");
       forceStyle(store, element, "backdrop-filter", backdrop);
+      if (element.matches(MASTHEAD_BACKDROP_SELECTOR)) {
+        // YouTube hides this layer on chip-bar and watch pages; keep the shared blur visible.
+        forceStyle(store, element, "display", "block");
+        forceStyle(store, element, "opacity", "1");
+      }
       if (element.matches(BACKDROP_RESET_SELECTOR)) {
         forceStyle(store, element, "filter", "none");
       }
@@ -424,6 +437,8 @@
           // Text updates cannot introduce a new glass surface.
           if (!changedElements) continue;
           if (glassEnabled()) {
+            // Adding/removing the background sibling changes which node owns the header blur.
+            if (target.matches("ytd-masthead")) glassElements.add(target);
             // This ancestor's :has(#chips-wrapper) rule depends on added and removed children.
             const chipBar = target.closest("ytd-feed-filter-chip-bar-renderer");
             if (chipBar) glassElements.add(chipBar);
@@ -446,12 +461,11 @@
                 (dialogRoots.has(target) || target.matches(DIALOG_SURFACE_SELECTOR) || record.attributeName === "role")) {
               glassRoots.add(target);
             }
+            // Expanded Unified search transfers the fill from the input to its parent.
+            if (record.attributeName === "class" && target.matches(".ytSearchboxComponentInputContainer")) {
+              glassRoots.add(target);
+            }
           }
-        }
-        if (glassEnabled() && (target.matches(SEARCH_SUGGESTION_SELECTOR) ||
-            target.closest("yt-searchbox, ytd-searchbox, ytd-masthead"))) {
-          const masthead = target.closest("ytd-masthead") || document.querySelector("ytd-masthead");
-          if (masthead) glassElements.add(masthead);
         }
         if (record.type === "attributes" && record.attributeName === "style" &&
             (target.closest(HOMEPAGE_SCOPE_SELECTOR) ||
@@ -506,8 +520,15 @@
     html[data-ytc-theme] :is(${SHARED_BACKDROP_SELECTOR}) {
       backdrop-filter: none !important;
     }
-    html[data-ytc-theme] :is(${UNIVERSAL_GLASS_CLEAR_SELECTOR}):is(${FRAME_BACKDROP_SELECTOR}) {
+    html[data-ytc-theme] :is(${UNIVERSAL_GLASS_TARGET_SELECTOR}):is(ytd-masthead:has(> #background)) {
+      backdrop-filter: none !important;
+    }
+    html[data-ytc-theme] :is(${UNIVERSAL_GLASS_CLEAR_SELECTOR}):is(${FROSTED_WRAPPER_SELECTOR}) {
       backdrop-filter: ${GLASS_BACKDROP} !important;
+    }
+    html[data-ytc-theme] :is(${UNIVERSAL_GLASS_CLEAR_SELECTOR}):is(${MASTHEAD_BACKDROP_SELECTOR}) {
+      display: block !important;
+      opacity: 1 !important;
     }
     html[data-ytc-theme] :is(${BACKDROP_RESET_SELECTOR}) {
       filter: none !important;

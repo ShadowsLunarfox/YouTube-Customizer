@@ -57,6 +57,18 @@ const fixture = `<!doctype html><html><head><style>
     </div>
     <div class="ytSpecBottomSheetLayoutFooterWrapper" data-layer style="${darkStyle}">New playlist</div>
   </div>
+  <tp-yt-paper-dialog id="download-quality-panel" data-panel data-layer role="dialog" style="${darkStyle}">
+    <ytd-download-quality-selector-renderer data-layer style="${darkStyle}">
+      <yt-formatted-string id="title">Download Quality</yt-formatted-string>
+      <ytd-download-quality-selector-content data-layer style="${darkStyle}">
+        <div id="quality-options" data-layer style="${darkStyle}">Standard (480p)</div>
+        <div id="upsell-section" data-layer style="${darkStyle}">Premium</div>
+      </ytd-download-quality-selector-content>
+      <div class="buttons" data-layer style="${darkStyle}">
+        <button id="download-quality-cancel">Cancel</button><button>Download</button>
+      </div>
+    </ytd-download-quality-selector-renderer>
+  </tp-yt-paper-dialog>
 </ytd-popup-container></ytd-app><script>
   document.getElementById("playlist-toggle").addEventListener("click", event => {
     const button = event.currentTarget;
@@ -218,7 +230,7 @@ const fixture = `<!doctype html><html><head><style>
     await popup.evaluate(() => chrome.storage.sync.set({ themeEnabled: true }));
     await verifyLayers(70);
     assert.deepEqual(errors, []);
-    console.log("PASS: modern and legacy Save dialogs use one shared-opacity layer, survive repaint/replacement, preserve controls/media, and restore original surfaces when disabled.");
+    console.log("PASS: Save and Download Quality dialogs use one shared-opacity layer, survive repaint/replacement, preserve controls/media, and restore original surfaces when disabled.");
   } finally {
     clearTimeout(deadline);
     await context.close();

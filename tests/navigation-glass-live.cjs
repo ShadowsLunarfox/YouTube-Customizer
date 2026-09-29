@@ -116,14 +116,14 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright");
       });
       assert.equal(state.background, `rgba(33, 33, 33, ${opacity / 100})`);
       assert.equal(state.opacity, "1");
-      assert.equal(state.blur, "blur(12px)", "masthead uses the selected frosted-glass blur");
+      assert.equal(state.blur, "none", "masthead leaves search suggestions outside a backdrop root");
       if (state.chips) {
         assert.equal(state.chips.background, state.background);
         assert.equal(state.chips.blur, "blur(12px)", "chip bar uses the same frosted-glass blur");
       }
       for (const layer of state.layers) {
         assert.equal(layer.background, "rgba(0, 0, 0, 0)", layer.id);
-        assert.equal(layer.blur, "none", layer.id);
+        assert.equal(layer.blur, layer.id === "background" ? "blur(12px)" : "none", layer.id);
         assert.equal(layer.image, "none", layer.id);
       }
     }

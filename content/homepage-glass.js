@@ -1,7 +1,7 @@
 // Keeps homepage feed surfaces transparent so a custom wallpaper remains visible.
 (() => {
   const runtime = globalThis.YTCustomizerContent ||= {};
-  if (runtime.buildHomepageGlassCss) return;
+  if (runtime.homepageVersion === YTCustomizer.version) return;
 
   runtime.buildHomepageGlassCss = () => `
     html[data-ytc-home-glass] :is(ytd-app, ytd-page-manager, ytd-browse[page-subtype="home"],
@@ -33,7 +33,7 @@
       ytd-masthead #masthead-container, ytd-feed-filter-chip-bar-renderer,
       ytd-feed-filter-chip-bar-renderer #chips-wrapper, yt-chip-cloud-renderer,
       ytd-mini-guide-renderer, ytd-guide-renderer, yt-searchbox,
-      .ytSearchboxComponentInputContainer, .ytChipShapeChip,
+      .ytSearchboxComponentInputBox, .ytChipShapeChip,
       .ytSpecTouchFeedbackShapeFill, .ytSpecButtonShapeNextHost,
       yt-chip-cloud-chip-renderer, yt-chip-cloud-chip-renderer #chip-container) {
       background: transparent !important;
@@ -68,4 +68,5 @@
       filter: none !important;
     }
   `;
+  runtime.homepageVersion = YTCustomizer.version;
 })();

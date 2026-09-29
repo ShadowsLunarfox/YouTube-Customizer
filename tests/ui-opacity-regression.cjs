@@ -21,8 +21,8 @@ const fixture = `<!doctype html><html><head><style>
     <div id="background" style="background:#111"></div>
     <div id="container" style="background:#111"><span id="fixture-text">YouTube</span>
       <div id="center" style="background:#111"><yt-searchbox id="search">
-        <div class="ytSearchboxComponentInputContainer" data-surface>
-          <div class="ytSearchboxComponentInputBox"><input aria-label="Search" placeholder="Search"></div>
+        <div class="ytSearchboxComponentInputContainer">
+          <div class="ytSearchboxComponentInputBox" data-surface><input aria-label="Search" placeholder="Search"></div>
         </div><button class="ytSearchboxComponentSearchButton" data-surface>Search</button>
       </yt-searchbox></div>
     </div>
@@ -36,10 +36,16 @@ const fixture = `<!doctype html><html><head><style>
   </ytd-rich-section-renderer></ytd-browse></ytd-page-manager>
   <div class="html5-video-player"><video id="fixture-video"></video><div class="ytp-play-progress"></div></div>
   <ytd-watch-metadata><div id="description" data-surface>Description</div></ytd-watch-metadata>
-  <ytd-comments><div id="contents" data-surface>Comments</div></ytd-comments>
+  <ytd-comments data-surface><div id="contents">Comments</div></ytd-comments>
   <ytd-playlist-panel-renderer data-surface><div id="header">Playlist</div><div id="items">Track</div></ytd-playlist-panel-renderer>
   <ytd-tabbed-page-header data-surface><div id="page-header-container">Channel</div></ytd-tabbed-page-header>
   <ytd-menu-popup-renderer data-surface>Menu</ytd-menu-popup-renderer>
+  <ytd-multi-page-menu-renderer id="notifications-popup" data-surface>
+    <div id="header" style="display:block;background:#202020!important">
+      <ytd-simple-menu-header-renderer style="display:block;background:#202020!important">Notifications</ytd-simple-menu-header-renderer>
+    </div>
+    <div id="container">Important</div>
+  </ytd-multi-page-menu-renderer>
   <button class="ytSpecButtonShapeNextHost" data-surface>Like<span class="ytSpecTouchFeedbackShapeFill"></span></button>
   <ytd-live-chat-frame><div id="chat"><iframe src="/live_chat?v=fixture"></iframe></div></ytd-live-chat-frame>
 </ytd-app></body></html>`;
@@ -130,7 +136,9 @@ const chatFixture = `<!doctype html><html><head><style>
       assert.equal(await page.locator(selector).evaluate(el => getComputedStyle(el).opacity), "1");
     }
     const clearSelectors = ["ytd-masthead #background", "ytd-masthead #container", "ytd-masthead #center",
+      "yt-searchbox", ".ytSearchboxComponentInputContainer",
       "ytd-guide-renderer #guide-inner-content", "ytd-feed-filter-chip-bar-renderer", "#chip-container",
+      "#notifications-popup > #header", "#notifications-popup > #header ytd-simple-menu-header-renderer",
       "#frosted-glass", "#masthead-container",
       "ytd-live-chat-frame", "ytd-live-chat-frame #chat", "ytd-live-chat-frame iframe"];
     for (const selector of clearSelectors) {
@@ -138,8 +146,10 @@ const chatFixture = `<!doctype html><html><head><style>
     }
     for (const selector of ["#frosted-glass", "#masthead-container", "ytd-masthead #background", "#chips-wrapper"]) {
       assert.equal(await page.locator(selector).evaluate(el => getComputedStyle(el).backdropFilter),
-        selector === "#chips-wrapper" ? "blur(12px)" : "none", selector + " uses the selected blur only on its painted panel");
+        ["#chips-wrapper", "ytd-masthead #background"].includes(selector) ? "blur(12px)" : "none", selector + " uses the selected blur only on its shared backdrop layer");
     }
+    assert.equal(await page.locator("#notifications-popup").evaluate(el => getComputedStyle(el).backdropFilter), "blur(12px)");
+    assert.equal(await page.locator("#notifications-popup > #header").evaluate(el => getComputedStyle(el).backdropFilter), "none");
     assert.equal(await page.locator("#frosted-glass").evaluate(el => getComputedStyle(el, "::before").backgroundImage), "none");
     assert.equal(await page.locator("#frosted-glass").evaluate(el => getComputedStyle(el, "::before").backdropFilter), "none");
     assert.equal(await page.locator("yt-chip-cloud-chip-renderer[selected]").evaluate(el => getComputedStyle(el).color), "rgb(241, 241, 241)");
@@ -188,7 +198,7 @@ const chatFixture = `<!doctype html><html><head><style>
     }
     for (const selector of ["#frosted-glass", "#masthead-container", "ytd-masthead #background", "#chips-wrapper"]) {
       assert.equal(await page.locator(selector).evaluate(el => getComputedStyle(el).backdropFilter),
-        selector === "#chips-wrapper" ? "blur(12px)" : "none", "repaint restores the selected panel blur and clears decorative blur");
+        ["#chips-wrapper", "ytd-masthead #background"].includes(selector) ? "blur(12px)" : "none", "repaint restores the selected panel blur and clears decorative blur");
       assert.equal(await page.locator(selector).evaluate(el => getComputedStyle(el).filter), "none");
     }
     await page.evaluate(() => {
@@ -262,6 +272,7 @@ const chatFixture = `<!doctype html><html><head><style>
     assert.equal(await page.locator("ytd-masthead").evaluate(el => getComputedStyle(el).backgroundColor), "rgb(17, 17, 17)", "restore original YouTube style");
     assert.equal(await page.locator("html").evaluate(el => el.style.getPropertyValue("--ytc-ui-opacity")), "");
     assert.equal(await page.locator("#frosted-glass").evaluate(el => getComputedStyle(el).backdropFilter), "blur(48px)", "theme off restores YouTube blur");
+    assert.equal(await page.locator("#notifications-popup > #header").evaluate(el => getComputedStyle(el).backgroundColor), "rgb(32, 32, 32)", "theme off restores the native notification header");
     await edit("themeEnabled", true);
     await verifyOpacity(70);
     await popup.evaluate(async tabId => {

@@ -1,7 +1,7 @@
 // Connects the settings form to storage and applies live previews to the active YouTube tab.
 const {
   version: SCRIPT_VERSION, defaults: DEFAULT_SETTINGS, assetDefaults, presets, tabKeys,
-  normalize, normalizeAssets, isImageData, iconDataUri
+  normalize, normalizeAssets, isImageData, isBackgroundData, iconDataUri
 } = YTCustomizer;
 
 const form = document.querySelector("#settings-form");
@@ -11,6 +11,7 @@ const themePreset = document.querySelector("#themePreset");
 const preview = document.querySelector(".preview");
 const previewThumb = document.querySelector(".preview-thumb");
 const themePreview = document.querySelector(".theme-preview");
+const themePreviewVideo = document.querySelector(".theme-preview-wallpaper");
 const tabs = [...document.querySelectorAll('[role="tab"]')];
 const assetControls = {
   customIconData: { input: "customIcon", upload: "uploadCustomIcon", remove: "removeCustomIcon" },
@@ -27,6 +28,15 @@ let previewInFlight = false;
 let lastSentAssets = {};
 let applicationError = "";
 let initialized = false;
+let previewVideoData = "";
+
+function silenceVideo(video) {
+  video.defaultMuted = true;
+  video.muted = true;
+  video.volume = 0;
+}
+
+themePreviewVideo.addEventListener("volumechange", () => silenceVideo(themePreviewVideo));
 
 function readForm() {
   return normalize(Object.fromEntries(Object.entries(fields).map(([key, input]) => [
@@ -44,6 +54,8 @@ function writeForm(settings) {
 }
 
 function updatePreview() {
+  const videoBackground = assets.backgroundImageData.startsWith("data:video/mp4;");
+  if (videoBackground && fields.backgroundFit.value === "tile") fields.backgroundFit.value = "cover";
   const settings = readForm();
   for (const id of ["barHeight", "thumbSize", "backgroundOpacity", "uiOpacity", "uiBlur", "relatedThumbnailWidth"]) {
     document.getElementById(id + "Value").value = settings[id];
@@ -63,16 +75,38 @@ function updatePreview() {
   for (const [css, key] of [["page", "pageColor"], ["surface", "surfaceColor"], ["text", "textColor"], ["accent", "accentColor"]]) {
     themePreview.style.setProperty("--theme-" + css, theme[key]);
   }
-  const withImage = settings.themeEnabled && settings.backgroundMode === "image" && assets.backgroundImageData;
+  const withImage = settings.themeEnabled && settings.backgroundMode === "image" &&
+    assets.backgroundImageData && !videoBackground;
+  const withVideo = settings.themeEnabled && settings.backgroundMode === "image" && videoBackground;
   themePreview.style.backgroundImage = withImage
     ? 'linear-gradient(color-mix(in srgb, ' + settings.pageColor + ' ' + (100 - settings.backgroundOpacity) + '%, transparent), color-mix(in srgb, ' + settings.pageColor + ' ' + (100 - settings.backgroundOpacity) + '%, transparent)), url("' + assets.backgroundImageData + '")'
     : "none";
   themePreview.style.backgroundSize = settings.backgroundFit === "tile" ? "auto, 32px" : settings.backgroundFit;
   themePreview.style.backgroundRepeat = settings.backgroundFit === "tile" ? "repeat" : "no-repeat";
+  if (withVideo) {
+    if (previewVideoData !== assets.backgroundImageData) {
+      previewVideoData = assets.backgroundImageData;
+      silenceVideo(themePreviewVideo);
+      themePreviewVideo.src = previewVideoData;
+    }
+    themePreviewVideo.style.objectFit = settings.backgroundFit;
+    themePreviewVideo.style.opacity = String(settings.backgroundOpacity / 100);
+    themePreviewVideo.hidden = false;
+    void themePreviewVideo.play().catch(() => {});
+  } else {
+    themePreviewVideo.pause();
+    themePreviewVideo.hidden = true;
+    if (!videoBackground && previewVideoData) {
+      previewVideoData = "";
+      themePreviewVideo.removeAttribute("src");
+      themePreviewVideo.load();
+    }
+  }
   themePreset.value = !settings.themeEnabled ? "original" :
     Object.keys(presets).find(name => Object.entries(presets[name]).every(([key, value]) => settings[key] === value)) || "custom";
   fields.thumbStyle.querySelector('[value="custom"]').disabled = !assets.customIconData;
   fields.backgroundMode.querySelector('[value="image"]').disabled = !assets.backgroundImageData;
+  fields.backgroundFit.querySelector('[value="tile"]').disabled = videoBackground;
   for (const [key, control] of Object.entries(assetControls)) {
     document.getElementById(control.remove).hidden = !assets[key];
   }
@@ -214,20 +248,48 @@ form.addEventListener("input", onFormEdit);
 form.addEventListener("change", onFormEdit);
 form.addEventListener("submit", event => event.preventDefault());
 
-function readImage(file) {
+function readAsset(file, key) {
   return new Promise((resolve, reject) => {
-    if (!/^image\/(png|jpeg|webp|gif|avif)$/.test(file.type)) return reject(new Error("Unsupported image format"));
-    if (!file.size || file.size > 5 * 1024 * 1024) return reject(new Error("Choose an image under 5 MB"));
+    const background = key === "backgroundImageData";
+    const video = background && (file.type === "video/mp4" || /\.mp4$/i.test(file.name));
+    if (!video && !/^image\/(png|jpeg|webp|gif|avif)$/.test(file.type)) {
+      return reject(new Error(background ? "Choose a PNG, JPEG, WebP, GIF, AVIF, or MP4 file" : "Unsupported image format"));
+    }
+    const limit = (background ? 10 : 5) * 1024 * 1024;
+    if (!file.size || file.size > limit) {
+      return reject(new Error(`Choose a file no larger than ${background ? 10 : 5} MB`));
+    }
     const reader = new FileReader();
-    reader.onerror = () => reject(new Error("Could not read image"));
+    reader.onerror = () => reject(new Error("Could not read file"));
     reader.onload = async () => {
       try {
-        if (!isImageData(reader.result)) throw new Error();
-        const image = new Image();
-        image.src = reader.result;
-        await image.decode();
-        resolve(reader.result);
-      } catch { reject(new Error("Invalid image file")); }
+        const data = video ? "data:video/mp4;base64," + reader.result.split(",")[1] : reader.result;
+        if (!(background ? isBackgroundData(data) : isImageData(data))) throw new Error();
+        if (video) {
+          const preview = document.createElement("video");
+          silenceVideo(preview);
+          preview.preload = "metadata";
+          const url = URL.createObjectURL(file);
+          try {
+            await new Promise((done, fail) => {
+              const timeout = setTimeout(() => fail(new Error("Video metadata timed out")), 15000);
+              preview.onloadedmetadata = () => { clearTimeout(timeout); done(); };
+              preview.onerror = () => { clearTimeout(timeout); fail(new Error("Video cannot be decoded")); };
+              preview.src = url;
+            });
+            if (!preview.videoWidth || !preview.videoHeight) throw new Error("No video track");
+          } finally {
+            preview.removeAttribute("src");
+            preview.load();
+            URL.revokeObjectURL(url);
+          }
+        } else {
+          const image = new Image();
+          image.src = data;
+          await image.decode();
+        }
+        resolve(data);
+      } catch { reject(new Error(video ? "Invalid or unsupported MP4 file" : "Invalid image file")); }
     };
     reader.readAsDataURL(file);
   });
@@ -244,22 +306,22 @@ for (const [key, control] of Object.entries(assetControls)) {
     if (!file) return;
     upload.disabled = remove.disabled = true;
     try {
-      const data = await readImage(file);
-      const [used, previousSize] = await Promise.all([
-        chrome.storage.local.getBytesInUse(null), chrome.storage.local.getBytesInUse(key)
-      ]);
-      if (used - previousSize + data.length + key.length + 32 > chrome.storage.local.QUOTA_BYTES) {
-        throw new Error("Image storage is full. Choose a smaller file.");
-      }
+      const data = await readAsset(file, key);
       await chrome.storage.local.set({ [key]: data });
       assets[key] = data;
       if (key === "customIconData") fields.thumbStyle.value = "custom";
-      else { fields.backgroundMode.value = "image"; fields.themeEnabled.checked = true; }
+      else {
+        fields.backgroundMode.value = "image";
+        fields.themeEnabled.checked = true;
+        if (data.startsWith("data:video/mp4;") && fields.backgroundFit.value === "tile") {
+          fields.backgroundFit.value = "cover";
+        }
+      }
       updatePreview();
       applyToCurrentTab();
-      await saveSettings("Image loaded");
+      await saveSettings(key === "backgroundImageData" ? "Background loaded" : "Image loaded");
     } catch (error) {
-      showStatus(error.message || "Could not save image", true);
+      showStatus(error.message || "Could not save file", true);
     } finally {
       upload.disabled = remove.disabled = false;
     }
@@ -272,8 +334,8 @@ for (const [key, control] of Object.entries(assetControls)) {
       if (key === "backgroundImageData") fields.backgroundMode.value = "color";
       updatePreview();
       applyToCurrentTab();
-      await saveSettings("Image removed");
-    } catch { showStatus("Could not remove image", true); }
+      await saveSettings(key === "backgroundImageData" ? "Background removed" : "Image removed");
+    } catch { showStatus("Could not remove file", true); }
   });
 }
 

@@ -18,7 +18,7 @@
 
 | Section | What you can customize |
 | --- | --- |
-| 🎨 **Appearance** | Page theme, colors, opacity, frosted glass, background images, and GIFs |
+| 🎨 **Appearance** | Page theme, colors, opacity, frosted glass, background images, GIFs, and silent MP4 videos |
 | ▶️ **Player** | Progress and buffer colors, bar thickness, scrubber shape, and effects |
 | 🧩 **Layout** | Video grid, hover previews, Shorts, sidebar, comments, and live chat |
 
@@ -26,7 +26,7 @@
 
 - Choose the **Charcoal**, **Light**, **Forest**, or **Windows Classic** theme, or set your own page, surface, text, and accent colors.
 - Adjust UI opacity from 0–100% and frosted-glass blur from 0–30 px.
-- Upload a background image or GIF, choose Fill, Fit, or Tile, and adjust its opacity.
+- Upload a background image, GIF, or MP4 video up to 10 MB, choose Fill or Fit, and adjust its opacity. Images can also be tiled. MP4 videos loop silently.
 - YouTube ambient lighting is suppressed while a custom background is active.
 
 ### ▶️ Player
@@ -57,13 +57,15 @@ YouTube Customizer is a Manifest V3 extension for Chromium-based browsers, inclu
 
 1. Open YouTube and click the extension icon in the browser toolbar.
 2. In **Appearance**, enable **Enable page theme**, choose a theme, and adjust its colors, opacity, or blur.
-3. In **Wallpaper**, upload a background image. In **Player**, customize the progress bar and scrubber.
+3. In **Wallpaper**, upload a background image, GIF, or MP4 video. In **Player**, customize the progress bar and scrubber.
 4. In **Layout**, hide page elements or adjust the video layout as needed.
 5. Changes are previewed live and saved automatically. Use **Reset tab** to reset the current settings section, or **Reset all** to restore the default settings.
 
-## 🖼️ Images and settings storage
+## 🖼️ Backgrounds and settings storage
 
-- Supported image formats: PNG, JPEG, WebP, AVIF, and GIF. Each image must be no larger than **5 MB**. GIF animation is preserved.
+- Backgrounds support PNG, JPEG, WebP, AVIF, GIF, and MP4 up to **10 MB** per file. GIF animation is preserved; MP4 videos loop with sound permanently muted.
+- Custom scrubber icons support PNG, JPEG, WebP, AVIF, and GIF up to **5 MB**.
+- The `unlimitedStorage` permission lets the extension save 10 MB backgrounds after they are encoded for browser storage.
 - Theme and layout settings are stored in browser sync storage. Whether they sync across devices depends on your browser account's sync settings.
 - Uploaded backgrounds and custom scrubber images are stored locally in the current browser and do not sync with your settings.
 

@@ -19,8 +19,8 @@ const fixture = `<!doctype html><html><head><style>
   .watch-panel { width:360px; height:160px; box-sizing:border-box; margin-bottom:16px; }
 </style></head><body><ytd-app class="with-chipbar">
   <div id="frosted-glass" data-clear></div><div id="masthead-container" data-clear>
-    <ytd-masthead id="masthead" data-blurred style="backdrop-filter:blur(9px)!important">
-      <div id="background" data-clear></div><div id="container" data-clear>Navigation</div>
+    <ytd-masthead id="masthead" data-clear style="backdrop-filter:blur(9px)!important">
+      <div id="background" data-frosted-wrapper style="display:none;opacity:0"></div><div id="container" data-clear>Navigation</div>
     </ytd-masthead>
   </div>
   <ytd-feed-filter-chip-bar-renderer data-clear><div id="chips-wrapper" data-blurred>Topics</div></ytd-feed-filter-chip-bar-renderer>

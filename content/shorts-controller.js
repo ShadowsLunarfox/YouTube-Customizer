@@ -122,7 +122,8 @@
           rect.right > 0 && rect.left < innerWidth;
       };
       const videos = [...document.querySelectorAll("video")]
-        .filter(video => visible(video) && video.clientHeight >= 20);
+        .filter(video => video.id !== "ytc-background-video" && video.closest(SHORTS_SCOPE_SELECTOR) &&
+          visible(video) && video.clientHeight >= 20);
       const video = videos.sort((a, b) => b.clientWidth * b.clientHeight - a.clientWidth * a.clientHeight)[0];
       const player = video?.closest(".html5-video-player") || document.querySelector("#shorts-player") || video;
       const videoBounds = (video || player)?.getBoundingClientRect();

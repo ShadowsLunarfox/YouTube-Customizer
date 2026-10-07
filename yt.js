@@ -9,12 +9,13 @@
 
   const INSTANCE_KEY = "__ytProgressCustomizer";
   const previous = globalThis[INSTANCE_KEY];
-  if (previous?.version === SCRIPT_VERSION) return;
+  if (previous?.version === SCRIPT_VERSION && !previous.disposed) return;
   previous?.dispose();
 
   let currentSettings = { ...DEFAULT_SETTINGS };
   let currentAssets = { ...assetDefaults };
-  let styleEl = document.getElementById("yt-custom-progress-style");
+  // Page-owned elements can reuse our ID; keep an owned node instead of adopting theirs.
+  let styleEl = null;
   let stateRevision = 0;
   let disposed = false;
   let stylesApplied = false;
@@ -203,6 +204,23 @@
       html body .ytp-play-progress,
       html body .ytp-hover-progress,
       html body .ytp-volume-slider-handle::before { background: ${settings.progressColor} !important; }
+
+      /* Keep the track centered and outside the white volume knob. */
+      html body .html5-video-player .ytp-volume-slider-handle::before,
+      html body .html5-video-player .ytp-volume-slider-handle::after {
+        top: 50% !important;
+        margin-top: 0 !important;
+        margin-left: 0 !important;
+        transform: translateY(-50%) !important;
+      }
+      html body .html5-video-player .ytp-volume-slider-handle::before {
+        left: auto !important;
+        right: 100% !important;
+      }
+      html body .html5-video-player .ytp-volume-slider-handle::after {
+        left: 100% !important;
+        right: auto !important;
+      }
 
       html body .ytp-load-progress,
       html body .ytp-progress-list .ytp-load-progress { background: ${settings.bufferColor} !important; }
@@ -625,11 +643,50 @@
   }
 
   function buildGridCss(settings) {
+    const home = 'html body ytd-browse[page-subtype="home"]';
+    const channelGrid = 'html body ytd-browse[page-subtype="channels"] ytd-rich-grid-renderer';
+    // Size channel cards from the content area, while honoring the maximum column setting.
+    const channelColumns = Array.from({ length: 5 }, (_, index) => `
+      @container ytc-channel-videos (min-width: ${288 * (index + 2)}px) {
+        ${channelGrid} #contents {
+          --ytc-grid-columns: ${Math.min(settings.videosPerRow, index + 2)} !important;
+        }
+      }
+    `).join("\n");
     // Shorts shelves size cards independently of the regular rich-grid columns.
     const shortsShelf = "html body grid-shelf-view-model:has(ytm-shorts-lockup-view-model, ytm-shorts-lockup-view-model-v2)";
     const legacyShorts = "html body ytd-rich-shelf-renderer[is-shorts] > #dismissible > #contents-container > #contents";
+    const homeShorts = home + ' grid-shelf-view-model:not([hidden], .ytGridShelfViewModelHostIsDismissed)' +
+      ':has(ytm-shorts-lockup-view-model, ytm-shorts-lockup-view-model-v2)';
+    const homeLegacyShorts = home + ' ytd-rich-shelf-renderer[is-shorts] > #dismissible > #contents-container > #contents';
+    // Modern shelves pre-group cards into rows; flatten those rows into one grid.
+    const homeShortsRows = `:is(${homeShorts}:has(> .ytGridShelfViewModelGridShelfRow),
+      ${homeShorts} :has(> .ytGridShelfViewModelGridShelfRow))`;
     const shortsGap = 16;
+    const homeShortsCss = settings.hideShorts ? "" : `
+      /* Home Shorts use the same effective column count as regular videos. */
+      ${homeShortsRows}, ${homeLegacyShorts} {
+        display: grid !important;
+        grid-template-columns: repeat(var(--ytc-grid-columns), minmax(0, 1fr)) !important;
+        gap: ${shortsGap}px !important;
+      }
+      ${homeShortsRows} > .ytGridShelfViewModelGridShelfRow:not([hidden]) {
+        display: contents !important;
+      }
+      ${homeShortsRows} > :not(.ytGridShelfViewModelGridShelfRow),
+      ${homeLegacyShorts} > grid-shelf-view-model {
+        grid-column: 1 / -1 !important;
+      }
+      ${homeShorts} :is(ytm-shorts-lockup-view-model, ytm-shorts-lockup-view-model-v2),
+      ${home} ytd-rich-shelf-renderer[is-shorts] ytd-rich-grid-slim-media {
+        box-sizing: border-box !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+      }
+    `;
     return `
+      ${home},
       html body ytd-rich-grid-renderer,
       html body ytd-rich-grid-renderer #contents {
         --ytc-grid-columns: ${settings.videosPerRow};
@@ -644,24 +701,38 @@
       }
       /* Keep the column count within the setting without shrinking cards on narrow windows. */
       @media (max-width: 1023px) {
+        ${home},
         html body ytd-rich-grid-renderer,
         html body ytd-rich-grid-renderer #contents {
           --ytc-grid-columns: ${Math.min(settings.videosPerRow, 3)};
         }
       }
       @media (max-width: 799px) {
+        ${home},
         html body ytd-rich-grid-renderer,
         html body ytd-rich-grid-renderer #contents {
           --ytc-grid-columns: ${Math.min(settings.videosPerRow, 2)};
         }
       }
       @media (max-width: 479px) {
+        ${home},
         html body ytd-rich-grid-renderer,
         html body ytd-rich-grid-renderer #contents {
           --ytc-grid-columns: 1;
         }
       }
-      ${shortsShelf} .ytGridShelfViewModelGridShelfRow,
+      ${channelGrid} {
+        container-type: inline-size;
+        container-name: ytc-channel-videos;
+        /* An explicit width prevents inline containment from shrinking the native grid. */
+        width: 100% !important;
+        min-width: 0 !important;
+      }
+      ${channelGrid} #contents {
+        --ytc-grid-columns: 1 !important;
+      }
+      ${channelColumns}
+      ${shortsShelf} .ytGridShelfViewModelGridShelfRow:not([hidden]),
       ${legacyShorts} {
         display: grid !important;
         grid-template-columns: repeat(auto-fit, minmax(max(180px,
@@ -675,6 +746,7 @@
         max-width: none !important;
         margin-inline: 0 !important;
       }
+      ${homeShortsCss}
     `;
   }
 
@@ -845,11 +917,20 @@
   }
 
   function onMessage(message, sender, sendResponse) {
+    if (disposed || sender?.id !== chrome.runtime.id || sender?.url !== chrome.runtime.getURL("popup.html")) return false;
     if (message?.type !== "YT_PROGRESS_PING" && message?.type !== "YT_PROGRESS_LIVE_PREVIEW") return;
+    if (message.type === "YT_PROGRESS_LIVE_PREVIEW" &&
+        (!message.settings || typeof message.settings !== "object" || Array.isArray(message.settings) ||
+          message.assets !== undefined && (!message.assets || typeof message.assets !== "object" || Array.isArray(message.assets)))) return false;
     ready.then(() => {
+      if (disposed) { sendResponse({ version: SCRIPT_VERSION, applied: false }); return; }
       if (message.type === "YT_PROGRESS_LIVE_PREVIEW") {
         stateRevision++;
-        applyStyles(message.settings, { ...currentAssets, ...message.assets });
+        const assets = { ...currentAssets };
+        for (const key of Object.keys(assetDefaults)) {
+          if (message.assets && Object.hasOwn(message.assets, key)) assets[key] = message.assets[key];
+        }
+        applyStyles(message.settings, assets);
       }
       sendResponse({
         version: SCRIPT_VERSION,
@@ -884,7 +965,8 @@
     surfaces.handleMutations(records);
   });
   observer.observe(document.documentElement, {
-    childList: true, subtree: true, attributes: true, attributeFilter: ["style", "class", "hidden", "role"]
+    childList: true, subtree: true, attributes: true,
+    attributeFilter: ["style", "class", "hidden", "role", "has-paygated-featured-badge", "is-shorts"]
   });
 
   const shortsEvents = ["yt-navigate-finish", "yt-page-data-updated", "fullscreenchange", "visibilitychange", "play", "loadeddata"];
@@ -897,6 +979,7 @@
 
   globalThis[INSTANCE_KEY] = {
     version: SCRIPT_VERSION,
+    get disposed() { return disposed; },
     dispose() {
       disposed = true;
       observer.disconnect();
@@ -924,6 +1007,8 @@
       document.documentElement.style.removeProperty("--ytc-ui-opacity");
       document.documentElement.style.removeProperty("--ytc-ui-blur");
       document.documentElement.style.removeProperty("--ytc-ui-backdrop");
+      styleEl?.remove();
+      styleEl = null;
     }
   };
 })();

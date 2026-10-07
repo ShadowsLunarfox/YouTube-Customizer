@@ -62,47 +62,76 @@
   };
 
   function normalize(settings = {}) {
+    const source = settings && typeof settings === "object" && !Array.isArray(settings) ? settings : {};
     const result = {};
     for (const [key, fallback] of Object.entries(defaults)) {
-      const value = settings?.[key];
+      const value = Object.hasOwn(source, key) ? source[key] : undefined;
       if (typeof fallback === "boolean") result[key] = typeof value === "boolean" ? value : fallback;
       else if (ranges[key]) {
-        const number = Number(value);
-        result[key] = value !== undefined && Number.isFinite(number)
-          ? Math.min(ranges[key][1], Math.max(ranges[key][0], number)) : fallback;
+        const numeric = typeof value === "number" || typeof value === "string" && value.trim() !== "";
+        const number = numeric ? Number(value) : NaN;
+        result[key] = Number.isFinite(number)
+          ? Math.min(ranges[key][1], Math.max(ranges[key][0], Math.round(number))) : fallback;
       } else if (choices[key]) result[key] = choices[key].includes(value) ? value : fallback;
       else result[key] = typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value) ? value : fallback;
     }
     return result;
   }
 
+  function isMediaData(value, limit, allowVideo) {
+    if (typeof value !== "string" || value.length > 4 * Math.ceil(limit / 3) + 32) return false;
+    const header = /^data:(image\/(?:png|jpeg|webp|gif|avif)|video\/mp4);base64,/i.exec(value);
+    if (!header || !allowVideo && header[1].toLowerCase() === "video/mp4") return false;
+    const payload = value.slice(header[0].length);
+    if (!payload || payload.length % 4 === 1 || !/^[a-z0-9+/]+={0,2}$/i.test(payload)) return false;
+    const padding = payload.endsWith("==") ? 2 : payload.endsWith("=") ? 1 : 0;
+    if (padding && payload.length % 4 !== 0) return false;
+    const bytes = Math.floor(payload.length * 3 / 4) - padding;
+    return bytes > 0 && bytes <= limit;
+  }
+
   function isImageData(value) {
-    return typeof value === "string" && value.length <= 7 * 1024 * 1024 &&
-      /^data:image\/(?:png|jpeg|webp|gif|avif);base64,[a-z0-9+/]+={0,2}$/i.test(value);
+    return isMediaData(value, 5 * 1024 * 1024, false);
   }
 
   function isBackgroundData(value) {
-    return typeof value === "string" && value.length <= 4 * Math.ceil(20 * 1024 * 1024 / 3) + 32 &&
-      /^data:(?:image\/(?:png|jpeg|webp|gif|avif)|video\/mp4);base64,[a-z0-9+/]+={0,2}$/i.test(value);
+    return isMediaData(value, 20 * 1024 * 1024, true);
   }
 
   function normalizeAssets(assets = {}) {
-    return {
-      customIconData: isImageData(assets.customIconData) ? assets.customIconData : "",
-      backgroundImageData: isBackgroundData(assets.backgroundImageData) ? assets.backgroundImageData : ""
+    const source = assets && typeof assets === "object" && !Array.isArray(assets) ? assets : {};
+    const asset = (key, validate) => {
+      const value = Object.hasOwn(source, key) ? source[key] : "";
+      if (!validate(value)) return "";
+      const comma = value.indexOf(",");
+      // Canonicalize only the MIME header; Base64 payloads are case sensitive.
+      return value.slice(0, comma).toLowerCase() + value.slice(comma);
     };
+    return {
+      customIconData: asset("customIconData", isImageData),
+      backgroundImageData: asset("backgroundImageData", isBackgroundData)
+    };
+  }
+
+  function isYouTubeUrl(value) {
+    if (typeof value !== "string") return false;
+    try {
+      const url = new URL(value);
+      return url.protocol === "https:" && !url.username && !url.password &&
+        (url.hostname === "youtube.com" || url.hostname.endsWith(".youtube.com"));
+    } catch { return false; }
   }
 
   function iconDataUri(style, color, customIconData = "") {
     if (style === "custom" && isImageData(customIconData)) return customIconData;
     const safeColor = /^#[0-9a-f]{6}$/i.test(color) ? color : defaults.thumbColor;
     const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="' +
-      safeColor + '">' + (shapes[style] || shapes.circle) + "</svg>";
+      safeColor + '">' + (Object.hasOwn(shapes, style) ? shapes[style] : shapes.circle) + "</svg>";
     return "data:image/svg+xml," + encodeURIComponent(svg);
   }
 
   globalThis.YTCustomizer = Object.freeze({
-    version: "78", defaults, assetDefaults, presets, tabKeys, normalize, normalizeAssets,
-    isImageData, isBackgroundData, iconDataUri
+    version: "81", defaults, assetDefaults, presets, tabKeys, normalize, normalizeAssets,
+    isImageData, isBackgroundData, isYouTubeUrl, iconDataUri
   });
 })();

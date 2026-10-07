@@ -43,6 +43,29 @@
       ytd-download-quality-selector-renderer) :is(#voice-search-dialog, #dialog, #download-dialog,
       #report-form, #content, #contents, #container))`;
   const BACKDROP_RESET_SELECTOR = NAVIGATION_BACKDROP_SELECTOR + "," + DIALOG_SURFACE_SELECTOR;
+  const TOPICS_SHELF_SELECTOR = 'ytd-browse[page-subtype="home"] ' +
+    ':is(ytd-chips-shelf-with-video-shelf-renderer, .ytdChipsShelfWithVideoShelfRendererHost)';
+  const MEMBERSHIPS_SHELF_SELECTOR = 'ytd-browse[page-subtype="home"] ' +
+    'ytd-rich-shelf-renderer[has-paygated-featured-badge]:not([is-shorts])';
+  const SEARCH_SHORTS_SHELF_SELECTOR = 'ytd-search :is(ytd-reel-shelf-renderer, ' +
+    'grid-shelf-view-model:not(ytd-reel-shelf-renderer *):has(' +
+    'ytm-shorts-lockup-view-model, ytm-shorts-lockup-view-model-v2))';
+  // Modern v2 cards wrap the classic lockup; tint and inset only the outer card.
+  const SEARCH_SHORTS_CARD_SELECTOR = SEARCH_SHORTS_SHELF_SELECTOR +
+    ' :is(ytd-reel-item-renderer, ytm-shorts-lockup-view-model-v2:not(ytd-reel-item-renderer *), ' +
+    'ytm-shorts-lockup-view-model:not(:is(ytm-shorts-lockup-view-model-v2, ytd-reel-item-renderer) *))';
+  const SEARCH_SHORTS_FOOTER_SELECTOR = SEARCH_SHORTS_SHELF_SELECTOR +
+    ' .ytGridShelfViewModelGridShelfBottomButtonContainer';
+  const CHANNEL_SCOPE_SELECTOR = 'ytd-browse[page-subtype="channels"]';
+  const CHANNEL_PANEL_SELECTOR = CHANNEL_SCOPE_SELECTOR + ' ytd-item-section-renderer';
+  const CHANNEL_CARD_TYPES = 'ytd-rich-item-renderer, ytd-grid-video-renderer, ' +
+    'ytd-grid-playlist-renderer, ytd-grid-channel-renderer, ytd-post-renderer, ytd-reel-item-renderer, ' +
+    'yt-lockup-view-model:not(:is(ytd-rich-item-renderer, ytd-post-renderer) *), ' +
+    'ytm-shorts-lockup-view-model-v2:not(ytd-reel-item-renderer *), ' +
+    'ytm-shorts-lockup-view-model:not(:is(ytm-shorts-lockup-view-model-v2, ytd-reel-item-renderer) *)';
+  const CHANNEL_CARD_SELECTOR = CHANNEL_SCOPE_SELECTOR + ' :is(' + CHANNEL_CARD_TYPES + ')';
+  const CHANNEL_HEADER_SURFACE_SELECTOR = CHANNEL_SCOPE_SELECTOR +
+    ' :is(yt-page-header-renderer, ytd-c4-tabbed-header-renderer #channel-header, tp-yt-paper-tabs)';
   const UNIVERSAL_GLASS_TARGET_SELECTORS = [
     "ytd-masthead", "ytd-masthead #background", "ytd-masthead #masthead-container",
     "ytd-mini-guide-renderer", "ytd-guide-renderer", "ytd-guide-renderer #guide",
@@ -52,7 +75,12 @@
     "yt-chip-cloud-chip-renderer", "yt-chip-cloud-chip-renderer #chip-container",
     ".ytChipShapeChip", ".ytSpecTouchFeedbackShapeFill", ".ytSpecButtonShapeNextHost",
     "ytd-rich-item-renderer", "ytd-rich-section-renderer", "ytd-rich-shelf-renderer", "ytd-watch-metadata #description",
+    TOPICS_SHELF_SELECTOR, TOPICS_SHELF_SELECTOR + " button",
+    MEMBERSHIPS_SHELF_SELECTOR + " button",
+    SEARCH_SHORTS_SHELF_SELECTOR, SEARCH_SHORTS_CARD_SELECTOR,
     "ytd-video-renderer", "ytd-compact-video-renderer", "yt-lockup-view-model",
+    "ytd-search ytd-channel-renderer",
+    CHANNEL_PANEL_SELECTOR, CHANNEL_CARD_SELECTOR, CHANNEL_HEADER_SURFACE_SELECTOR,
     "ytd-feed-nudge-renderer #content-wrapper",
     "ytd-comments", "ytd-watch-next-secondary-results-renderer", "ytd-playlist-panel-renderer",
     "ytd-playlist-sidebar-renderer", "ytd-live-chat-frame", "yt-live-chat-renderer",
@@ -61,6 +89,9 @@
     "ytd-tabbed-page-header", "ytd-c4-tabbed-header-renderer", "ytd-playlist-header-renderer",
     "yt-page-header-renderer", "yt-page-header-view-model",
     ".ytp-popup", ".ytp-tooltip-text", "tp-yt-paper-tooltip #tooltip",
+    // Modern volume controls paint one capsule; its hover pseudo layer stays clear.
+    ".html5-video-player.ytp-delhi-modern.ytp-delhi-horizontal-volume-controls .ytp-volume-area",
+    ".html5-video-player.ytp-delhi-modern .ytp-volume-popover",
     "tp-yt-app-drawer #contentContainer", "ytd-engagement-panel-section-list-renderer #content",
     "ytd-masthead #search", "ytd-masthead #center", "ytd-masthead #container", "yt-searchbox",
     SEARCH_UNIFIED_SURFACE_SELECTOR, ".ytSearchboxComponentInputBox",
@@ -79,6 +110,15 @@
     "ytd-feed-filter-chip-bar-renderer:has(#chips-wrapper)", "ytd-feed-filter-chip-bar-renderer yt-chip-cloud-renderer",
     "yt-chip-cloud-chip-renderer #chip-container", "yt-chip-cloud-chip-renderer .ytChipShapeChip",
     "ytd-rich-item-renderer yt-lockup-view-model",
+    TOPICS_SHELF_SELECTOR + " ytd-rich-shelf-renderer",
+    TOPICS_SHELF_SELECTOR + " ytd-rich-shelf-renderer .button-container",
+    MEMBERSHIPS_SHELF_SELECTOR + " > #dismissible > .button-container",
+    SEARCH_SHORTS_FOOTER_SELECTOR,
+    // Blur on the outer header moves its fixed descendants into a new containing block.
+    CHANNEL_SCOPE_SELECTOR + ' :is(ytd-tabbed-page-header, ytd-c4-tabbed-header-renderer)',
+    CHANNEL_PANEL_SELECTOR + ' :is(ytd-shelf-renderer, ytd-rich-shelf-renderer, grid-shelf-view-model)',
+    CHANNEL_SCOPE_SELECTOR + ' ytd-post-renderer :is(#dismissible, #body, #header, #toolbar)',
+    CHANNEL_SCOPE_SELECTOR + ' .ytGridShelfViewModelGridShelfBottomButtonContainer',
     ".ytSpecTouchFeedbackShapeFill", "ytd-rich-section-renderer",
     `.ytSearchboxComponentInputContainer:not(${SEARCH_UNIFIED_SURFACE_SELECTOR})`,
     `${SEARCH_UNIFIED_SURFACE_SELECTOR} :is(.ytSearchboxComponentInputBox, .ytSearchboxComponentSearchButton)`,
@@ -90,7 +130,8 @@
     "yt-live-chat-message-input-renderer", "yt-live-chat-message-input-renderer #input-panel",
     "yt-live-chat-message-input-renderer #input", "ytd-tabbed-page-header #page-header-container",
     "ytd-tabbed-page-header #page-header", "ytd-tabbed-page-header #tabs-container",
-    "ytd-tabbed-page-header #tabs-inner-container", "ytd-c4-tabbed-header-renderer #channel-header",
+    "ytd-tabbed-page-header #tabs-inner-container",
+    'ytd-c4-tabbed-header-renderer #channel-header:not(' + CHANNEL_SCOPE_SELECTOR + ' *)',
     "yt-page-header-renderer yt-page-header-view-model",
     "yt-page-header-renderer .ytPageHeaderViewModelBackground",
     "yt-page-header-view-model .ytPageHeaderViewModelBackground",
@@ -122,12 +163,18 @@
   // Search controls keep their own blur; the masthead backdrop lives on a sibling layer.
   const SHARED_BACKDROP_SELECTOR = `:is(ytd-comments, ytd-watch-metadata #description,
     ytd-watch-next-secondary-results-renderer, ytd-playlist-panel-renderer, ytd-playlist-sidebar-renderer,
-    ytd-rich-item-renderer, ytd-video-renderer, yt-lockup-view-model,
+    ytd-rich-item-renderer, ytd-video-renderer, yt-lockup-view-model, ytd-search ytd-channel-renderer,
     ytd-guide-renderer, ytd-mini-guide-renderer, ytd-feed-filter-chip-bar-renderer,
     ytd-menu-popup-renderer, ytd-multi-page-menu-renderer, yt-live-chat-renderer,
     ytd-engagement-panel-section-list-renderer #content, .ytp-popup,
+    ${CHANNEL_PANEL_SELECTOR}, ${CHANNEL_CARD_SELECTOR}, ${CHANNEL_HEADER_SURFACE_SELECTOR},
     ${DIALOG_SURFACE_SELECTOR}) :is(.ytSpecButtonShapeNextHost, yt-chip-cloud-chip-renderer,
-    .ytChipShapeChip, ytd-guide-entry-renderer, ytd-mini-guide-entry-renderer)`;
+    .ytChipShapeChip, ytd-guide-entry-renderer, ytd-mini-guide-entry-renderer),
+    ${TOPICS_SHELF_SELECTOR} button,
+    ${MEMBERSHIPS_SHELF_SELECTOR} :is(ytd-rich-item-renderer, yt-lockup-view-model, button),
+    ${SEARCH_SHORTS_CARD_SELECTOR},
+    ${SEARCH_SHORTS_SHELF_SELECTOR} .ytSpecButtonShapeNextHost,
+    ${CHANNEL_PANEL_SELECTOR} :is(${CHANNEL_CARD_TYPES})`;
   const HOMEPAGE_SCOPE_SELECTOR = 'ytd-browse[page-subtype="home"]';
   const LIVE_CHAT_SHADOW_STYLE_ATTR = "data-ytc-live-chat-surface";
   const LIVE_CHAT_SHADOW_CSS = `
@@ -144,6 +191,11 @@
       background-image: none !important;
       -webkit-backdrop-filter: ${GLASS_BACKDROP} !important;
       backdrop-filter: ${GLASS_BACKDROP} !important;
+    }
+    :host(yt-live-chat-app):host-context(html[data-ytc-theme]) #contents,
+    :host(yt-live-chat-renderer):host-context(html[data-ytc-theme]) #contents {
+      border-radius: 16px !important;
+      overflow: clip !important;
     }
   `;
 
@@ -253,11 +305,16 @@
         "#cinematics, #cinematics-container, #cinematics-full-bleed-container, " +
         "ytd-reel-video-renderer #cinematic-container, ytd-shorts #shorts-cinematic-container, " +
         "ytd-shorts #cinematic-shorts-scrim, [id*='cinematic' i], [class*='cinematic' i], " +
-        "[id*='ambient' i], [class*='ambient' i]"
+        "[id*='ambient' i], [class*='ambient' i], [" + AMBIENT_BLOCKED_ATTR + "]"
       ));
       candidates.forEach(element => {
         const name = (element.id + " " + (typeof element.className === "string" ? element.className : "")).toLowerCase();
-        if (/cinematic|ambient/.test(name)) element.setAttribute(AMBIENT_BLOCKED_ATTR, "");
+        // Collection artwork uses "Cinematic" too; it is content, not an ambient layer.
+        const media = element.matches("img, video") || element.closest(
+          "ytd-thumbnail, yt-thumbnail-view-model, yt-collection-thumbnail-view-model, yt-image-banner-view-model"
+        );
+        if (!media && /cinematic|ambient/.test(name)) element.setAttribute(AMBIENT_BLOCKED_ATTR, "");
+        else element.removeAttribute(AMBIENT_BLOCKED_ATTR);
       });
     }
 
@@ -442,6 +499,9 @@
             // This ancestor's :has(#chips-wrapper) rule depends on added and removed children.
             const chipBar = target.closest("ytd-feed-filter-chip-bar-renderer");
             if (chipBar) glassElements.add(chipBar);
+            // A grid shelf becomes a Shorts surface when its first card arrives.
+            const searchShelf = target.closest("ytd-search grid-shelf-view-model");
+            if (searchShelf) glassElements.add(searchShelf);
           }
         } else if (glassEnabled()) {
           if (record.attributeName === "style") {
@@ -465,12 +525,21 @@
             if (record.attributeName === "class" && target.matches(".ytSearchboxComponentInputContainer")) {
               glassRoots.add(target);
             }
+            // YouTube can identify or recycle a featured shelf after inserting its children.
+            if (["has-paygated-featured-badge", "is-shorts"].includes(record.attributeName) &&
+                target.matches("ytd-rich-shelf-renderer")) {
+              glassRoots.add(target);
+            }
           }
         }
         if (record.type === "attributes" && record.attributeName === "style" &&
             (target.closest(HOMEPAGE_SCOPE_SELECTOR) ||
               target.closest("ytd-masthead, ytd-feed-filter-chip-bar-renderer"))) {
           enforceHomepageStyle(target);
+        }
+        if (record.type === "attributes" && record.attributeName === "class" &&
+            (target.hasAttribute(AMBIENT_BLOCKED_ATTR) || /cinematic|ambient/i.test(target.className))) {
+          scheduleAmbientBlocker();
         }
       }
       if (addedNodes) scheduleHomepageSync();
@@ -501,6 +570,166 @@
   }
 
   runtime.createSurfaceController = createSurfaceController;
+  function buildChannelSurfaceCss() {
+    const channel = 'html[data-ytc-theme] ' + CHANNEL_SCOPE_SELECTOR;
+    const videoGridCard = channel + ' ytd-rich-grid-renderer ytd-rich-item-renderer:not([is-slim-media])';
+    const lockupMenu = ':is(.ytLockupMetadataViewModelMenuButton, ' +
+      '.yt-lockup-metadata-view-model__menu-button, .yt-lockup-metadata-view-model-wiz__menu-button)';
+    return `
+      /* Each channel section owns its glass; its arrows stay below the sticky header. */
+      html[data-ytc-theme] :is(${CHANNEL_PANEL_SELECTOR}) {
+        box-sizing: border-box !important;
+        min-width: 0 !important;
+        padding: 12px !important;
+        margin-bottom: 16px !important;
+        border: 0 !important;
+        border-radius: 16px !important;
+        position: relative !important;
+        isolation: isolate !important;
+      }
+      html[data-ytc-theme] :is(${CHANNEL_HEADER_SURFACE_SELECTOR}) {
+        box-sizing: border-box !important;
+        border-radius: 16px !important;
+      }
+      ${channel} :is(yt-page-header-renderer, ytd-c4-tabbed-header-renderer #channel-header) {
+        padding: 12px !important;
+      }
+      ${channel} tp-yt-paper-tabs {
+        padding-inline: 12px !important;
+      }
+      ${channel} ytd-section-list-renderer {
+        padding-top: 16px !important;
+      }
+      ${channel} :is(ytd-two-column-browse-results-renderer,
+        ytd-two-column-browse-results-renderer > #primary, ytd-section-list-renderer) {
+        box-sizing: border-box !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+      }
+      ${channel} :is(yt-image-banner-view-model, #banner.ytd-c4-tabbed-header-renderer) {
+        border-radius: 16px !important;
+        overflow: hidden !important;
+      }
+      html[data-ytc-theme] :is(${CHANNEL_CARD_SELECTOR}) {
+        box-sizing: border-box !important;
+        border-radius: 16px !important;
+      }
+      html[data-ytc-theme] :is(${CHANNEL_CARD_SELECTOR}):not(ytd-post-renderer) {
+        padding: 10px !important;
+      }
+      /* Fit fixed-width carousel lockups within their new card padding. */
+      ${channel} yt-lockup-view-model > .ytLockupViewModelHost,
+      ${channel} ytm-shorts-lockup-view-model-v2 > ytm-shorts-lockup-view-model {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+      }
+      ${channel} yt-horizontal-list-renderer #items > :is(${CHANNEL_CARD_TYPES}) {
+        flex-shrink: 0 !important;
+        align-self: stretch !important;
+        height: auto !important;
+        margin-inline-end: 12px !important;
+      }
+      ${channel} yt-horizontal-list-renderer #items {
+        display: flex !important;
+        width: max-content !important;
+        align-items: stretch !important;
+        padding-top: 0 !important;
+        margin-bottom: 8px !important;
+      }
+      /* Keep the native sliding track, with equal card heights and inset controls. */
+      ${channel} yt-horizontal-list-renderer :is(#scroll-outer-container, #scroll-container) {
+        min-width: 0 !important;
+        max-width: 100% !important;
+      }
+      ${channel} yt-horizontal-list-renderer #scroll-container {
+        margin-top: 0 !important;
+        border-radius: 12px !important;
+      }
+      ${channel} yt-horizontal-list-renderer #left-arrow {
+        left: 20px !important;
+      }
+      ${channel} yt-horizontal-list-renderer #right-arrow {
+        right: 20px !important;
+      }
+      /* Compact posts need room below the preview for the entire action bar. */
+      ${channel} yt-horizontal-list-renderer ytd-post-renderer[uses-compact-lockup] {
+        padding: 12px !important;
+        min-height: 220px !important;
+      }
+      ${channel} yt-horizontal-list-renderer ytd-post-renderer[uses-compact-lockup]
+        > #dismissible > #toolbar {
+        margin-top: auto !important;
+        padding-top: 8px !important;
+        flex-shrink: 0 !important;
+      }
+      ${channel} yt-horizontal-list-renderer ytd-post-renderer[uses-compact-lockup] #action-buttons {
+        flex: 1 !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+      }
+      ${channel} yt-horizontal-list-renderer ytd-post-renderer[uses-compact-lockup] #action-buttons #toolbar {
+        box-sizing: border-box !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+      }
+      ${channel} ytd-item-section-renderer :is(ytd-shelf-renderer, ytd-reel-shelf-renderer,
+        ytd-rich-shelf-renderer, grid-shelf-view-model) {
+        border: 0 !important;
+      }
+      ${channel} :is(ytd-thumbnail, yt-thumbnail-view-model,
+        .shortsLockupViewModelHostThumbnailParentContainer, ytd-backstage-image-renderer) {
+        border-radius: 12px !important;
+        overflow: hidden !important;
+      }
+      ${channel} ${lockupMenu} {
+        translate: -6px 0 !important;
+      }
+      /* Give grid titles and badges their own space beside the overflow menu. */
+      ${videoGridCard} :is(.ytLockupMetadataViewModelTextContainer,
+        .yt-lockup-metadata-view-model__text-container, .yt-lockup-metadata-view-model-wiz__text-container) {
+        flex: 1 !important;
+        min-width: 0 !important;
+      }
+      ${videoGridCard} ${lockupMenu} {
+        position: static !important;
+        translate: none !important;
+        transform: none !important;
+        flex: 0 0 40px !important;
+        align-self: flex-start !important;
+        margin-inline-start: 8px !important;
+        margin-top: -6px !important;
+      }
+      ${videoGridCard} ${lockupMenu} button {
+        min-width: 40px !important;
+        min-height: 40px !important;
+      }
+      ${videoGridCard} :is(.ytLockupMetadataViewModelTitle,
+        .yt-lockup-metadata-view-model__title, .yt-lockup-metadata-view-model-wiz__title) {
+        padding-inline-end: 0 !important;
+      }
+      ${channel} ytd-grid-video-renderer #menu {
+        right: 0 !important;
+      }
+      ${channel} .ytGridShelfViewModelGridShelfBottomButtonContainer {
+        position: static !important;
+        transform: none !important;
+        width: min(100%, 360px) !important;
+        margin: 12px auto 0 !important;
+        border-radius: 999px !important;
+      }
+      ${channel} :is(.ytPageHeaderViewModelTitle, .ytLockupMetadataViewModelTitle,
+        .shortsLockupViewModelHostMetadataTitle, .shortsLockupViewModelHostMetadataTitle a,
+        ytd-post-renderer #content-text, ytd-post-renderer #author-text) {
+        color: var(--yt-spec-text-primary) !important;
+      }
+      ${channel} :is(.ytContentMetadataViewModelMetadataText,
+        .ytContentMetadataViewModelMetadataText span, .shortsLockupViewModelHostMetadataSubhead) {
+        color: var(--yt-spec-text-secondary) !important;
+      }
+    `;
+  }
   // Share the same targets with CSS so new UI surfaces are styled before the observer runs.
   runtime.buildSurfaceCss = () => `
     /* Named view-transition surfaces prevent descendants from sampling the wallpaper in Chrome. */
@@ -511,6 +740,61 @@
       background: var(--ytc-universal-glass) !important;
       box-shadow: none !important;
       backdrop-filter: ${GLASS_BACKDROP} !important;
+    }
+    /* Keep search content inside rounded video and channel result cards. */
+    html[data-ytc-theme] ytd-search
+      :is(ytd-video-renderer, ytd-channel-renderer, yt-lockup-view-model:not(ytd-video-renderer *)) {
+      box-sizing: border-box !important;
+      padding: 12px !important;
+      border-radius: 16px !important;
+    }
+    html[data-ytc-theme] ytd-search :is(ytd-video-renderer, yt-lockup-view-model)
+      :is(ytd-thumbnail, yt-thumbnail-view-model) {
+      border-radius: 12px !important;
+      overflow: hidden !important;
+    }
+    html[data-ytc-theme] :is(${SEARCH_SHORTS_SHELF_SELECTOR}) {
+      box-sizing: border-box !important;
+      padding: 12px !important;
+      margin-block: 16px !important;
+      border: 0 !important;
+      border-radius: 16px !important;
+    }
+    html[data-ytc-theme] :is(${SEARCH_SHORTS_CARD_SELECTOR}) {
+      box-sizing: border-box !important;
+      padding: 8px !important;
+      border-radius: 16px !important;
+    }
+    html[data-ytc-theme] :is(${SEARCH_SHORTS_CARD_SELECTOR}):not(ytd-reel-item-renderer) {
+      width: 100% !important;
+    }
+    html[data-ytc-theme] :is(${SEARCH_SHORTS_SHELF_SELECTOR})
+      :is(ytd-thumbnail, yt-thumbnail-view-model, .shortsLockupViewModelHostThumbnailParentContainer) {
+      border-radius: 12px !important;
+      overflow: hidden !important;
+    }
+    html[data-ytc-theme] :is(${SEARCH_SHORTS_FOOTER_SELECTOR}) {
+      position: static !important;
+      transform: none !important;
+      width: min(100%, 360px) !important;
+      margin: 12px auto 0 !important;
+      border-radius: 999px !important;
+    }
+    /* Inset watch-panel contents and round the shared glass surface. */
+    html[data-ytc-theme] :is(ytd-watch-flexy, ytd-watch-grid)
+      :is(ytd-comments, ytd-watch-next-secondary-results-renderer) {
+      box-sizing: border-box !important;
+      padding: 12px !important;
+      border-radius: 16px !important;
+    }
+    /* Clip inner content to the panel corners without changing its scroll containers. */
+    html[data-ytc-theme] :is(ytd-live-chat-frame, yt-live-chat-renderer,
+      ytd-playlist-panel-renderer, ytd-playlist-sidebar-renderer) {
+      border-radius: 16px !important;
+      overflow: clip !important;
+    }
+    html[data-ytc-theme] ytd-live-chat-frame :is(#chat, iframe) {
+      border-radius: 16px !important;
     }
     html[data-ytc-theme] :is(${UNIVERSAL_GLASS_CLEAR_SELECTOR}) {
       background: transparent !important;
@@ -545,6 +829,7 @@
       box-shadow: none !important;
       backdrop-filter: none !important;
     }
+    ${buildChannelSurfaceCss()}
   `;
   runtime.surfaceVersion = YTCustomizer.version;
 })();

@@ -1,7 +1,7 @@
 // Connects the settings form to storage and applies live previews to the active YouTube tab.
 const {
   version: SCRIPT_VERSION, defaults: DEFAULT_SETTINGS, assetDefaults, presets, tabKeys,
-  normalize, normalizeAssets, isImageData, isBackgroundData, iconDataUri
+  normalize, normalizeAssets, isImageData, isBackgroundData, isYouTubeUrl, iconDataUri
 } = YTCustomizer;
 
 const form = document.querySelector("#settings-form");
@@ -145,7 +145,7 @@ function showStatus(message = "Saved", isError = false) {
 
 async function connectToCurrentTab() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id || !/^https?:\/\/([a-z0-9-]+\.)*youtube\.com\//i.test(tab.url || "")) {
+  if (!tab?.id || !isYouTubeUrl(tab.url)) {
     throw new Error("Open YouTube to preview");
   }
   let response = await chrome.tabs.sendMessage(tab.id, { type: "YT_PROGRESS_PING" }).catch(() => null);

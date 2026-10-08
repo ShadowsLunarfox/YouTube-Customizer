@@ -289,6 +289,7 @@
     const image = wallpaper ? 'linear-gradient(' + shade + ', ' + shade + '), url("' + backgroundImageUrl + '")' : "none";
     const fit = settings.backgroundFit === "tile" ? "auto" : settings.backgroundFit;
     const repeat = settings.backgroundFit === "tile" ? "repeat" : "no-repeat";
+    const theater = 'html[data-ytc-custom-background] :is(ytd-watch-flexy, ytd-watch-grid)[theater]:not([fullscreen])';
     return `
       html[data-ytc-theme] {
         --ytc-ui-background: ${rgba(surface, "var(--ytc-ui-opacity)")} !important;
@@ -523,8 +524,22 @@
         opacity: 0 !important;
       }
 
+      /* Blur the wallpaper behind the player; the video and controls remain sharp. */
+      ${theater} :is(#full-bleed-container, #player-full-bleed-container, #player-theater-container,
+        #player-container, ytd-player, ytd-player > #container, #movie_player, .html5-video-container) {
+        background: transparent !important;
+      }
+      ${theater} .player-container-background {
+        display: none !important;
+      }
+      /* The outer stage can sample the wallpaper across YouTube's player-resize transition layer. */
+      ${theater} :is(#full-bleed-container, #player-theater-container:not(#full-bleed-container *)) {
+        backdrop-filter: var(--ytc-ui-backdrop) !important;
+      }
+
       html[data-ytc-shorts-clean] :is(ytd-shorts, #shorts-container, #shorts-inner-container,
         ytd-reel-video-renderer, #shorts-player, #shorts-player .html5-video-container,
+        ytd-shorts > .navigation-container,
         ytd-masthead, ytd-masthead #background, ytd-masthead #gradient) { background: transparent !important; box-shadow: none !important; }
       @layer ytc-shorts-overrides {
         html[data-ytc-shorts-clean] [data-ytc-shorts-layer~="before"]::before,

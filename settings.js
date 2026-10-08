@@ -142,7 +142,7 @@
   }
 
   globalThis.YTCustomizer = Object.freeze({
-    version: "90", defaults, assetDefaults, presets, tabKeys, audioKeys, normalize, normalizeAssets,
+    version: "92", defaults, assetDefaults, presets, tabKeys, audioKeys, normalize, normalizeAssets,
     isImageData, isBackgroundData, isYouTubeUrl, iconDataUri
   });
 })();

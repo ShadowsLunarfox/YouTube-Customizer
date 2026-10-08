@@ -49,6 +49,11 @@
       ytd-download-quality-selector-renderer) :is(#voice-search-dialog, #dialog, #download-dialog,
       #report-form, #content, #contents, #container))`;
   const BACKDROP_RESET_SELECTOR = NAVIGATION_BACKDROP_SELECTOR + "," + DIALOG_SURFACE_SELECTOR;
+  const SHORTS_PANEL_SELECTOR = "ytd-shorts ytd-engagement-panel-section-list-renderer";
+  // The panel owns one glass layer. YouTube reuses #content in each comment's expander.
+  const SHORTS_PANEL_CLEAR_SELECTOR = SHORTS_PANEL_SELECTOR + ` :is(
+    ytd-engagement-panel-title-header-renderer, ytd-section-list-renderer,
+    ytd-item-section-renderer, ytd-comments, #header, #content, #contents, #footer)`;
   const TOPICS_SHELF_SELECTOR = 'ytd-browse[page-subtype="home"] ' +
     ':is(ytd-chips-shelf-with-video-shelf-renderer, .ytdChipsShelfWithVideoShelfRendererHost)';
   const MEMBERSHIPS_SHELF_SELECTOR = 'ytd-browse[page-subtype="home"] ' +
@@ -133,7 +138,8 @@
     // Modern volume controls paint one capsule; its hover pseudo layer stays clear.
     ".html5-video-player.ytp-delhi-modern.ytp-delhi-horizontal-volume-controls .ytp-volume-area",
     ".html5-video-player.ytp-delhi-modern .ytp-volume-popover",
-    "tp-yt-app-drawer #contentContainer", "ytd-engagement-panel-section-list-renderer #content",
+    "tp-yt-app-drawer #contentContainer", "ytd-engagement-panel-section-list-renderer > #content",
+    SHORTS_PANEL_SELECTOR,
     "ytd-masthead #search", "ytd-masthead #center", "ytd-masthead #container", "yt-searchbox",
     SEARCH_UNIFIED_SURFACE_SELECTOR, ".ytSearchboxComponentInputBox",
     ".ytSearchboxComponentSearchButton", ".ytSearchboxComponentSuggestionsContainer",
@@ -188,6 +194,7 @@
     "ytd-comments ytd-comment-thread-renderer", "ytd-comments ytd-comment-renderer",
     "ytd-comments ytd-comment-view-model", "ytd-comments ytd-comment-simplebox-renderer",
     "ytd-comments ytd-comment-thread-renderer #body",
+    SHORTS_PANEL_CLEAR_SELECTOR,
     "ytd-watch-next-secondary-results-renderer #items", "ytd-watch-next-secondary-results-renderer #contents",
     "ytd-watch-next-secondary-results-renderer :is(ytd-video-renderer, ytd-compact-video-renderer, yt-lockup-view-model, ytd-rich-item-renderer, ytd-rich-shelf-renderer)",
     "ytd-watch-next-secondary-results-renderer yt-lockup-metadata-view-model",
@@ -224,7 +231,7 @@
     ytd-rich-item-renderer, ytd-video-renderer, yt-lockup-view-model, ytd-search ytd-channel-renderer,
     ytd-guide-renderer, ytd-mini-guide-renderer, ytd-feed-filter-chip-bar-renderer,
     ytd-menu-popup-renderer, ytd-multi-page-menu-renderer, yt-live-chat-renderer,
-    ytd-engagement-panel-section-list-renderer #content, .ytp-popup,
+    ytd-engagement-panel-section-list-renderer > #content, ${SHORTS_PANEL_SELECTOR}, .ytp-popup,
     ${CHANNEL_PANEL_SELECTOR}, ${CHANNEL_CARD_SELECTOR}, ${CHANNEL_HEADER_SURFACE_SELECTOR},
     ${DIALOG_SURFACE_SELECTOR}) :is(.ytSpecButtonShapeNextHost, yt-chip-cloud-chip-renderer,
     .ytChipShapeChip, ytd-guide-entry-renderer, ytd-mini-guide-entry-renderer),
@@ -956,6 +963,23 @@
       box-sizing: border-box !important;
       padding: 12px !important;
       border-radius: 16px !important;
+    }
+    html[data-ytc-theme] :is(${SHORTS_PANEL_SELECTOR}) {
+      border-radius: 16px !important;
+      overflow: clip !important;
+      color: var(--yt-spec-text-primary) !important;
+    }
+    html[data-ytc-theme] :is(${SHORTS_PANEL_SELECTOR})
+      :is(ytd-engagement-panel-title-header-renderer, ytd-engagement-panel-title-header-renderer #title,
+        ytd-engagement-panel-title-header-renderer .ytSpecButtonShapeNextHost,
+        ytd-engagement-panel-title-header-renderer yt-icon) {
+      color: var(--yt-spec-text-primary) !important;
+    }
+    html[data-ytc-theme] :is(${SHORTS_PANEL_SELECTOR})
+      :is(#contextual-info, #published-time-text, #published-time-text a,
+        .published-time-text, .published-time-text a, #vote-count-middle,
+        ytd-pinned-comment-badge-renderer) {
+      color: var(--yt-spec-text-secondary) !important;
     }
     /* Clip inner content to the panel corners without changing its scroll containers. */
     html[data-ytc-theme] :is(ytd-live-chat-frame, yt-live-chat-renderer,

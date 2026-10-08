@@ -157,7 +157,7 @@ const fixture = `<!doctype html><style>
     });
     assert.equal(await page.locator('style#yt-custom-progress-style').count(), 0, "dispose removes only its owned stylesheet");
     assert.equal(await page.locator('#yt-custom-progress-style').inputValue(), "Page-owned content");
-    await inject(["settings.js","content/surface-controller.js","content/shorts-controller.js","content/homepage-glass.js","yt.js"]);
+    await inject(["settings.js","content/surface-controller.js","content/shorts-controller.js","content/homepage-glass.js","content/home-shorts-grid.js","content/audio-controller.js","yt.js"]);
     await page.waitForFunction(() => document.querySelectorAll('.ytc-shorts-gutter-mask').length===2);
     assert.equal((await send(popup,{type:"YT_PROGRESS_PING"})).applied, true, "a disposed script can be initialized again");
     assert.deepEqual(errors, []);

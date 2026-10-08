@@ -32,12 +32,20 @@
 ### ▶️ Player
 
 - Customize progress and buffered-segment colors, progress-bar thickness, and scrubber size.
+- Choose a separate color for the **Most replayed** heatmap, including its gradient and outline.
 - Choose a solid color, pulsing glow, moving shimmer, or cycling rainbow effect.
 - Pick a built-in scrubber shape or upload a custom image or GIF.
 
+### Audio
+
+- Open the separate **Audio** tab to enable volume boost up to **500%**, adjust bass, midrange, treble, and stereo balance, and optionally reduce clipping. Audio processing starts off; disabling it restores normal audio. Wallpaper and thumbnail previews are excluded.
+- **Reset tab** on Audio resets audio settings independently from Player and Appearance.
+
 ### 🧩 Layout and browsing
 
-- Set the Home video grid to 2–6 videos per row. Disable hover previews or reduce motion.
+- Set Home videos and Shorts to 2–6 items per row, with fewer columns on narrow windows. Disable hover previews or reduce motion.
+- Home Shorts initially show one row. Show more reveals the additional cards; changing the column setting collapses the shelf again.
+- Library pages use rounded panels and cards with the shared theme background, opacity, and blur: History, Playlists, Watch later, Liked videos, Downloads, Courses, and Clips.
 - Hide Shorts, the topic filter bar, the Create button, or the notifications button.
 - Independently hide Subscriptions, You, Explore, More from YouTube, and Report history in the sidebar.
 - Adjust related-video thumbnail width, or hide related videos, comments, or live chat.
@@ -58,8 +66,9 @@ YouTube Customizer is a Manifest V3 extension for Chromium-based browsers, inclu
 1. Open YouTube and click the extension icon in the browser toolbar.
 2. In **Appearance**, enable **Enable page theme**, choose a theme, and adjust its colors, opacity, or blur.
 3. In **Wallpaper**, upload a background image, GIF, or MP4 video. In **Player**, customize the progress bar and scrubber.
-4. In **Layout**, hide page elements or adjust the video layout as needed.
-5. Changes are previewed live and saved automatically. Use **Reset tab** to reset the current settings section, or **Reset all** to restore the default settings.
+4. In **Audio**, enable volume boost and adjust the equalizer or stereo balance.
+5. In **Layout**, hide page elements or adjust the video layout as needed.
+6. Changes are previewed live and saved automatically. Use **Reset tab** to reset the current settings section, or **Reset all** to restore the default settings.
 
 ## 🖼️ Backgrounds and settings storage
 
@@ -99,6 +108,8 @@ After changing or updating the project files, open the browser's extensions page
 | `settings.js` | Default settings, validation, and theme presets |
 | `popup.html`, `popup.css`, `popup.js` | Extension settings popup |
 | `yt.js`, `content/` | YouTube page styling and feature controllers |
+| `content/home-shorts-grid.js` | Homepage Shorts columns; updates on shelf structure changes and detaches outside Home |
+| `content/audio-controller.js` | Player volume boost and equalizer; native Web Audio nodes with normal-audio bypass |
 | `tests/` | Regression and browser smoke-test scripts |
 
 <div align="center">

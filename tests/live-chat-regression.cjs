@@ -43,7 +43,7 @@ const settings = {
       const [tab] = await chrome.tabs.query({ url: "https://www.youtube.com/watch*" });
       await chrome.scripting.executeScript({
         target: { tabId: tab.id, allFrames: true },
-        files: ["settings.js", "content/surface-controller.js", "content/shorts-controller.js", "content/homepage-glass.js", "yt.js"]
+        files: ["settings.js", "content/surface-controller.js", "content/shorts-controller.js", "content/homepage-glass.js", "content/home-shorts-grid.js", "content/audio-controller.js", "yt.js"]
       });
     }, { settings, wallpaper });
 

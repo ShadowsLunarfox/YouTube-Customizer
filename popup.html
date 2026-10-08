@@ -17,6 +17,7 @@
         <div class="tabs" role="tablist" aria-label="Settings">
           <button type="button" role="tab" id="tab-appearance" aria-controls="appearance-panel" aria-selected="true">Appearance</button>
           <button type="button" role="tab" id="tab-player" aria-controls="player-panel" aria-selected="false" tabindex="-1">Player</button>
+          <button type="button" role="tab" id="tab-audio" aria-controls="audio-panel" aria-selected="false" tabindex="-1">Audio</button>
           <button type="button" role="tab" id="tab-layout" aria-controls="layout-panel" aria-selected="false" tabindex="-1">Layout</button>
         </div>
         <div class="tab-content">
@@ -52,6 +53,12 @@
             <fieldset class="preview-group">
               <legend>Preview</legend>
               <div class="preview"><div class="preview-track">
+                <svg class="preview-heatmap" viewBox="0 0 360 40" preserveAspectRatio="none" aria-hidden="true">
+                  <defs><linearGradient id="preview-heatmap-gradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-opacity="1"></stop><stop offset="100%" stop-opacity="0"></stop>
+                  </linearGradient></defs>
+                  <path d="M0 38 C20 28 40 34 60 25 S90 8 110 18 S140 30 165 16 S190 1 210 10 S245 29 265 20 S295 2 315 13 S340 30 360 5 L360 40 L0 40 Z"></path>
+                </svg>
                 <div class="preview-buffer"></div><div class="preview-progress"></div>
                 <div class="preview-thumb" aria-hidden="true"></div>
               </div></div>
@@ -60,6 +67,8 @@
 <label class="field"><span>Progress color</span><input id="progressColor" type="color" ></label>
 <label class="field"><span>Progress effect</span><select id="progressEffect"><option value="solid">Solid color</option><option value="pulse">Pulsing glow (animated)</option><option value="shimmer">Moving shimmer</option><option value="rainbow">Rainbow cycle</option></select></label>
 <label class="field"><span>Buffer color</span><input id="bufferColor" type="color" ></label>
+<label class="field"><span>Most replayed color</span><input id="heatmapColor" type="color" aria-describedby="heatmapColorHint"></label>
+<p class="field-hint" id="heatmapColorHint">Colors the replay graph above the timeline, when available.</p>
 <label class="field range-field"><span>Bar thickness</span><input id="barHeight" type="range" min="3" max="14" value="5"><span class="measurement"><output id="barHeightValue" for="barHeight"></output><span>px</span></span></label>
 </div></fieldset>
             <fieldset><legend>Scrubber icon</legend><div class="field-list">
@@ -67,6 +76,20 @@
 <label class="field"><span>Icon color</span><input id="thumbColor" type="color" ></label>
 <label class="field range-field"><span>Icon size</span><input id="thumbSize" type="range" min="10" max="34" value="16"><span class="measurement"><output id="thumbSizeValue" for="thumbSize"></output><span>px</span></span></label>
 <div class="field upload-field"><span id="customIconLabel">Custom icon</span><div class="upload-actions" role="group" aria-labelledby="customIconLabel"><button type="button" id="uploadCustomIcon">Upload...</button><input id="customIcon" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/avif" aria-labelledby="customIconLabel" hidden><button type="button" id="removeCustomIcon" hidden>Remove</button></div></div>
+</div></fieldset>
+          </section>
+          <section id="audio-panel" role="tabpanel" aria-labelledby="tab-audio" tabindex="0" hidden>
+            <fieldset><legend>Audio</legend><div class="field-list">
+<label class="check-field"><input type="checkbox" id="audioEnabled"><span>Enable volume boost and equalizer</span></label>
+<label class="field range-field"><span>Volume boost</span><input id="volumeBoost" type="range" min="100" max="500" step="10" value="100"><span class="measurement"><output id="volumeBoostValue" for="volumeBoost"></output><span>%</span></span></label>
+<p class="field-hint">100% is normal. YouTube's volume and mute controls still work.</p>
+<label class="field range-field"><span>Bass</span><input id="bassGain" type="range" min="-12" max="12" step="1" value="0"><span class="measurement"><output id="bassGainValue" for="bassGain"></output><span>dB</span></span></label>
+<label class="field range-field"><span>Midrange</span><input id="midGain" type="range" min="-12" max="12" step="1" value="0"><span class="measurement"><output id="midGainValue" for="midGain"></output><span>dB</span></span></label>
+<label class="field range-field"><span>Treble</span><input id="trebleGain" type="range" min="-12" max="12" step="1" value="0"><span class="measurement"><output id="trebleGainValue" for="trebleGain"></output><span>dB</span></span></label>
+<label class="field range-field"><span>Stereo balance</span><input id="audioBalance" type="range" min="-100" max="100" step="5" value="0" aria-describedby="audioBalanceHint"><output id="audioBalanceValue" for="audioBalance" class="measurement"></output></label>
+<p class="field-hint" id="audioBalanceHint">Left &#8592; Center &#8594; Right. 0 dB leaves each frequency band unchanged.</p>
+<label class="check-field"><input type="checkbox" id="audioLimiter"><span>Reduce clipping at high volume</span></label>
+<p class="field-hint" id="audioStatus" role="status" aria-live="polite">Audio processing is off.</p>
 </div></fieldset>
           </section>
           <section id="layout-panel" role="tabpanel" aria-labelledby="tab-layout" tabindex="0" hidden>

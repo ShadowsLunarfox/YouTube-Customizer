@@ -4,6 +4,12 @@
   if (runtime.surfaceVersion === YTCustomizer.version) return;
 
   const AMBIENT_BLOCKED_ATTR = "data-ytc-ambient-blocked";
+  const AMBIENT_CANDIDATE_SELECTOR = "#cinematics, #cinematics-container, #cinematics-full-bleed-container, " +
+    "ytd-reel-video-renderer #cinematic-container, ytd-shorts #shorts-cinematic-container, " +
+    "ytd-shorts #cinematic-shorts-scrim, [id*='cinematic' i], [class*='cinematic' i], " +
+    "[id*='ambient' i], [class*='ambient' i], [" + AMBIENT_BLOCKED_ATTR + "]";
+  const LIVE_CHAT_HOST_SELECTOR = "yt-live-chat-app, yt-live-chat-renderer";
+  const PLAYER_SCOPE_SELECTOR = ".html5-video-player, #inline-player, #inline-preview-player";
   const UNIVERSAL_GLASS_ATTR = "data-ytc-universal-glass";
   const UNIVERSAL_GLASS_CLEAR_ATTR = "data-ytc-universal-clear";
   const GLASS_BACKDROP = "var(--ytc-ui-backdrop)";
@@ -66,6 +72,40 @@
   const CHANNEL_CARD_SELECTOR = CHANNEL_SCOPE_SELECTOR + ' :is(' + CHANNEL_CARD_TYPES + ')';
   const CHANNEL_HEADER_SURFACE_SELECTOR = CHANNEL_SCOPE_SELECTOR +
     ' :is(yt-page-header-renderer, ytd-c4-tabbed-header-renderer #channel-header, tp-yt-paper-tabs)';
+  // Library routes do not consistently expose a page-subtype. Use a route marker
+  // and the visible browse renderer, including headers mounted through a portal.
+  const LIBRARY_ATTR = 'data-ytc-library';
+  const LIBRARY_SCOPE_SELECTOR = `html[${LIBRARY_ATTR}] ytd-browse:not([hidden])`;
+  const LIBRARY_PANEL_SELECTOR = LIBRARY_SCOPE_SELECTOR + ' :is(ytd-item-section-renderer, ' +
+    'ytd-playlist-video-list-renderer, ytd-downloads-page-renderer, ytd-offline-page-renderer, ' +
+    'ytd-course-section-renderer, ytd-clip-section-renderer, ytd-message-renderer, ytd-background-promo-renderer)';
+  const LIBRARY_CLASSIC_CARD_TYPES = 'ytd-rich-item-renderer, ytd-video-renderer, ytd-grid-video-renderer, ' +
+    'ytd-playlist-renderer, ytd-grid-playlist-renderer, ytd-playlist-video-renderer, ' +
+    'ytd-download-item-renderer, ytd-offline-video-renderer, ytd-course-renderer, ' +
+    'ytd-clip-renderer, ytd-clip-video-renderer, ytd-reel-item-renderer';
+  const LIBRARY_CARD_TYPES = LIBRARY_CLASSIC_CARD_TYPES + ', ' +
+    `yt-lockup-view-model:not(:is(${LIBRARY_CLASSIC_CARD_TYPES}) *), ` +
+    `ytm-shorts-lockup-view-model-v2:not(:is(${LIBRARY_CLASSIC_CARD_TYPES}) *), ` +
+    `ytm-shorts-lockup-view-model:not(:is(${LIBRARY_CLASSIC_CARD_TYPES}, ytm-shorts-lockup-view-model-v2) *)`;
+  const LIBRARY_CARD_SELECTOR = LIBRARY_SCOPE_SELECTOR + ' :is(' + LIBRARY_CARD_TYPES + ')';
+  const LIBRARY_HEADER_SELECTOR = `html[${LIBRARY_ATTR}] :is(yt-page-header-renderer, ` +
+    'ytd-playlist-header-renderer, ytd-playlist-sidebar-renderer)';
+  const LIBRARY_HISTORY_CONTROLS_SELECTOR = `html[${LIBRARY_ATTR}="history"] ` +
+    'ytd-browse:not([hidden]) ytd-two-column-browse-results-renderer > #secondary';
+  const LIBRARY_INNER_SELECTOR = ':is(' + LIBRARY_CARD_SELECTOR + ') :is(#dismissible, #container, ' +
+    '#content, #contents, #details, #meta, yt-lockup-view-model, ytm-shorts-lockup-view-model, ' +
+    '.ytLockupViewModelHost, .ytLockupMetadataViewModelHost, ' +
+    '.yt-lockup-view-model-wiz__metadata, .yt-lockup-metadata-view-model-wiz__text-container, ' +
+    '.ytLockupMetadataViewModelTextContainer):not(' + PLAYER_SCOPE_SELECTOR + ', ' +
+    '.html5-video-player *, #inline-player *, #inline-preview-player *)';
+  const LIBRARY_CLEAR_SELECTOR = LIBRARY_SCOPE_SELECTOR +
+    ' :is(ytd-shelf-renderer, ytd-rich-shelf-renderer, grid-shelf-view-model, ' +
+    'ytd-playlist-video-list-renderer > #contents), ' + LIBRARY_INNER_SELECTOR + ', ' +
+    `:is(${LIBRARY_PANEL_SELECTOR}) > :is(#contents, #content, #container, #dismissible), ` +
+    `html[${LIBRARY_ATTR}] ytd-tabbed-page-header, ` +
+    `html[${LIBRARY_ATTR}] :is(ytd-playlist-header-renderer, ytd-playlist-sidebar-renderer) ` +
+    ':is(#background, #primary, #secondary, .playlist-header-background), ' +
+    LIBRARY_HISTORY_CONTROLS_SELECTOR + ' > #contents';
   const UNIVERSAL_GLASS_TARGET_SELECTORS = [
     "ytd-masthead", "ytd-masthead #background", "ytd-masthead #masthead-container",
     "ytd-mini-guide-renderer", "ytd-guide-renderer", "ytd-guide-renderer #guide",
@@ -81,6 +121,7 @@
     "ytd-video-renderer", "ytd-compact-video-renderer", "yt-lockup-view-model",
     "ytd-search ytd-channel-renderer",
     CHANNEL_PANEL_SELECTOR, CHANNEL_CARD_SELECTOR, CHANNEL_HEADER_SURFACE_SELECTOR,
+    LIBRARY_PANEL_SELECTOR, LIBRARY_CARD_SELECTOR, LIBRARY_HEADER_SELECTOR, LIBRARY_HISTORY_CONTROLS_SELECTOR,
     "ytd-feed-nudge-renderer #content-wrapper",
     "ytd-comments", "ytd-watch-next-secondary-results-renderer", "ytd-playlist-panel-renderer",
     "ytd-playlist-sidebar-renderer", "ytd-live-chat-frame", "yt-live-chat-renderer",
@@ -119,6 +160,7 @@
     CHANNEL_PANEL_SELECTOR + ' :is(ytd-shelf-renderer, ytd-rich-shelf-renderer, grid-shelf-view-model)',
     CHANNEL_SCOPE_SELECTOR + ' ytd-post-renderer :is(#dismissible, #body, #header, #toolbar)',
     CHANNEL_SCOPE_SELECTOR + ' .ytGridShelfViewModelGridShelfBottomButtonContainer',
+    LIBRARY_CLEAR_SELECTOR,
     ".ytSpecTouchFeedbackShapeFill", "ytd-rich-section-renderer",
     `.ytSearchboxComponentInputContainer:not(${SEARCH_UNIFIED_SURFACE_SELECTOR})`,
     `${SEARCH_UNIFIED_SURFACE_SELECTOR} :is(.ytSearchboxComponentInputBox, .ytSearchboxComponentSearchButton)`,
@@ -159,6 +201,22 @@
   // Include previously managed nodes so moving a card or removing a dialog role restores its old styles.
   const GLASS_UPDATE_SELECTOR = [UNIVERSAL_GLASS_TARGET_SELECTOR, UNIVERSAL_GLASS_CLEAR_SELECTOR,
     `[${UNIVERSAL_GLASS_ATTR}]`, `[${UNIVERSAL_GLASS_CLEAR_ATTR}]`].join(",");
+  // A conservative token index rejects timeline/SVG updates before testing the large
+  // contextual selectors. Include ancestor tokens too, so this can only overmatch.
+  const GLASS_CANDIDATE_TAGS = new Set([...GLASS_UPDATE_SELECTOR.matchAll(
+    /(?:^|[\s,(>+~])([a-z][a-z0-9-]*)(?=[\s.#\[():,>+~]|$)/g
+  )].map(match => match[1]));
+  const GLASS_CANDIDATE_IDS = new Set([...GLASS_UPDATE_SELECTOR.matchAll(/#([\w-]+)/g)].map(match => match[1]));
+  const GLASS_CANDIDATE_CLASSES = new Set([...GLASS_UPDATE_SELECTOR.matchAll(/\.([a-z_-][\w-]*)/gi)]
+    .map(match => match[1]));
+
+  function mightBeGlassElement(element) {
+    if (GLASS_CANDIDATE_TAGS.has(element.localName) || GLASS_CANDIDATE_IDS.has(element.id) ||
+        element.getAttribute("role") === "dialog" || element.hasAttribute(UNIVERSAL_GLASS_ATTR) ||
+        element.hasAttribute(UNIVERSAL_GLASS_CLEAR_ATTR)) return true;
+    for (const name of element.classList) if (GLASS_CANDIDATE_CLASSES.has(name)) return true;
+    return false;
+  }
   // Controls inside a frosted panel can use its blurred background without a second backdrop filter.
   // Search controls keep their own blur; the masthead backdrop lives on a sibling layer.
   const SHARED_BACKDROP_SELECTOR = `:is(ytd-comments, ytd-watch-metadata #description,
@@ -174,7 +232,10 @@
     ${MEMBERSHIPS_SHELF_SELECTOR} :is(ytd-rich-item-renderer, yt-lockup-view-model, button),
     ${SEARCH_SHORTS_CARD_SELECTOR},
     ${SEARCH_SHORTS_SHELF_SELECTOR} .ytSpecButtonShapeNextHost,
-    ${CHANNEL_PANEL_SELECTOR} :is(${CHANNEL_CARD_TYPES})`;
+    ${CHANNEL_PANEL_SELECTOR} :is(${CHANNEL_CARD_TYPES}),
+    :is(${LIBRARY_PANEL_SELECTOR}) :is(${LIBRARY_CARD_TYPES}),
+    :is(${LIBRARY_PANEL_SELECTOR}, ${LIBRARY_CARD_SELECTOR}, ${LIBRARY_HEADER_SELECTOR},
+      ${LIBRARY_HISTORY_CONTROLS_SELECTOR}) .ytSpecButtonShapeNextHost`;
   const HOMEPAGE_SCOPE_SELECTOR = 'ytd-browse[page-subtype="home"]';
   const LIVE_CHAT_SHADOW_STYLE_ATTR = "data-ytc-live-chat-surface";
   const LIVE_CHAT_SHADOW_CSS = `
@@ -206,7 +267,10 @@
     let chatTimer = 0;
     let homepageTimer = 0;
     let fullGlassScanPending = false;
+    let fullChatScanPending = false;
     let removedGlassNodes = false;
+    const ambientRoots = new Set();
+    const chatRoots = new Set();
     const glassRoots = new Set();
     const glassElements = new Set();
     const ownStyleValues = new WeakMap();
@@ -293,20 +357,35 @@
       else dialogRoots.delete(element);
     }
 
-    function syncAmbientBlocker() {
+    // Inspect new subtrees once rather than rescanning the entire feed on each preview update.
+    function collectCandidates(roots, selector) {
+      const candidates = new Set();
+      for (const root of roots) {
+        if (!root.isConnected) continue;
+        let nested = false;
+        for (let parent = root.parentElement; parent; parent = parent.parentElement) {
+          if (roots.has(parent)) { nested = true; break; }
+        }
+        if (nested) continue;
+        if (root.matches(selector)) candidates.add(root);
+        root.querySelectorAll(selector).forEach(element => candidates.add(element));
+      }
+      return candidates;
+    }
+
+    function syncAmbientBlocker(fullScan = false) {
+      clearTimeout(ambientTimer);
       ambientTimer = 0;
+      const roots = new Set(ambientRoots);
+      ambientRoots.clear();
       if (!customBackgroundEnabled()) {
         document.querySelectorAll("[" + AMBIENT_BLOCKED_ATTR + "]").forEach(element =>
           element.removeAttribute(AMBIENT_BLOCKED_ATTR)
         );
         return;
       }
-      const candidates = new Set(document.querySelectorAll(
-        "#cinematics, #cinematics-container, #cinematics-full-bleed-container, " +
-        "ytd-reel-video-renderer #cinematic-container, ytd-shorts #shorts-cinematic-container, " +
-        "ytd-shorts #cinematic-shorts-scrim, [id*='cinematic' i], [class*='cinematic' i], " +
-        "[id*='ambient' i], [class*='ambient' i], [" + AMBIENT_BLOCKED_ATTR + "]"
-      ));
+      const candidates = fullScan ? new Set(document.querySelectorAll(AMBIENT_CANDIDATE_SELECTOR)) :
+        collectCandidates(roots, AMBIENT_CANDIDATE_SELECTOR);
       candidates.forEach(element => {
         const name = (element.id + " " + (typeof element.className === "string" ? element.className : "")).toLowerCase();
         // Collection artwork uses "Cinematic" too; it is content, not an ambient layer.
@@ -318,8 +397,10 @@
       });
     }
 
-    function scheduleAmbientBlocker() {
-      if (disposed || ambientTimer) return;
+    function scheduleAmbientBlocker(root) {
+      if (!customBackgroundEnabled()) return;
+      ambientRoots.add(root);
+      if (ambientTimer) return;
       ambientTimer = setTimeout(syncAmbientBlocker, 120);
     }
 
@@ -416,14 +497,23 @@
 
     function syncLiveChatSurfaces() {
       chatTimer = 0;
+      const fullScan = fullChatScanPending;
+      const roots = new Set(chatRoots);
+      fullChatScanPending = false;
+      chatRoots.clear();
       if (!glassEnabled()) return;
-      document.querySelectorAll("yt-live-chat-app, yt-live-chat-renderer").forEach(host =>
+      const hosts = fullScan ? document.querySelectorAll(LIVE_CHAT_HOST_SELECTOR) :
+        collectCandidates(roots, LIVE_CHAT_HOST_SELECTOR);
+      hosts.forEach(host =>
         visitLiveChatShadowRoot(host.shadowRoot)
       );
     }
 
-    function scheduleLiveChatSurfaces() {
-      if (disposed || chatTimer) return;
+    function scheduleLiveChatSurfaces(root = document) {
+      if (!glassEnabled()) return;
+      if (root === document) fullChatScanPending = true;
+      else chatRoots.add(root.closest(LIVE_CHAT_HOST_SELECTOR) || root);
+      if (chatTimer) return;
       chatTimer = setTimeout(syncLiveChatSurfaces, 0);
     }
 
@@ -444,12 +534,12 @@
     }
 
     function enforceHomepageStyle(element) {
+      if (!customBackgroundEnabled() || location.pathname !== "/" || !element.isConnected ||
+          !element.style.background || element.closest(PLAYER_SCOPE_SELECTOR)) return;
       const inHomepage = element.closest(HOMEPAGE_SCOPE_SELECTOR) ||
         element.closest("ytd-masthead, ytd-feed-filter-chip-bar-renderer");
-      if (!customBackgroundEnabled() || location.pathname !== "/" || !element.isConnected ||
-          !inHomepage || element.matches(UNIVERSAL_GLASS_CLEAR_SELECTOR) ||
-          element.matches(UNIVERSAL_GLASS_TARGET_SELECTOR) || element.matches("video, img, canvas, iframe") ||
-          !element.style.background) return;
+      if (!inHomepage || element.matches(UNIVERSAL_GLASS_CLEAR_SELECTOR) ||
+          element.matches(UNIVERSAL_GLASS_TARGET_SELECTOR) || element.matches("video, img, canvas, iframe")) return;
       forceStyle(homepageStyles, element, "background", "var(--ytc-universal-glass)");
       forceStyle(homepageStyles, element, "box-shadow", "none");
       forceStyle(homepageStyles, element, "backdrop-filter", GLASS_BACKDROP);
@@ -465,8 +555,13 @@
     }
 
     function apply() {
+      const feed = location.pathname.match(/^\/feed\/(history|playlists|downloads|courses|clips)\/?$/)?.[1];
+      const list = location.pathname === '/playlist' ? new URLSearchParams(location.search).get('list') : null;
+      const library = feed || (list === 'WL' ? 'watch-later' : list === 'LL' ? 'liked' : '');
+      if (glassEnabled() && library) document.documentElement.setAttribute(LIBRARY_ATTR, library);
+      else document.documentElement.removeAttribute(LIBRARY_ATTR);
       syncHomepageState();
-      syncAmbientBlocker();
+      syncAmbientBlocker(true);
       scheduleUniversalGlass(true);
       scheduleLiveChatSurfaces();
     }
@@ -474,9 +569,18 @@
     function handleMutations(records) {
       if (disposed) return;
       let addedNodes = false;
+      // Mutation records describe the final DOM state; repeated writes to the same
+      // player's style/class in one frame need only one check per attribute.
+      const seenAttributes = new WeakMap();
       for (const record of records) {
         const target = record.target;
         if (!(target instanceof Element)) continue;
+        if (record.type === "attributes") {
+          const attributes = seenAttributes.get(target) || new Set();
+          if (attributes.has(record.attributeName)) continue;
+          attributes.add(record.attributeName);
+          seenAttributes.set(target, attributes);
+        }
         if (record.type === "attributes" && record.attributeName === "style" &&
             ownStyleValues.get(target) === target.getAttribute("style")) continue;
         if (record.type === "childList") {
@@ -485,6 +589,8 @@
             if (!(node instanceof Element)) continue;
             addedNodes = changedElements = true;
             if (glassEnabled()) glassRoots.add(node);
+            scheduleAmbientBlocker(node);
+            scheduleLiveChatSurfaces(node);
           }
           for (const node of record.removedNodes) {
             if (!(node instanceof Element)) continue;
@@ -503,7 +609,7 @@
             const searchShelf = target.closest("ytd-search grid-shelf-view-model");
             if (searchShelf) glassElements.add(searchShelf);
           }
-        } else if (glassEnabled()) {
+        } else if (glassEnabled() && (glassStyles.has(target) || mightBeGlassElement(target))) {
           if (record.attributeName === "style") {
             const managed = glassStyles.get(target);
             const overridden = managed && [...managed].some(([property, original]) =>
@@ -518,7 +624,7 @@
             if (glassStyles.has(target) || target.matches(GLASS_UPDATE_SELECTOR)) glassElements.add(target);
             // Changing a dialog role/class also changes the appearance of its nested panels.
             if (["class", "role"].includes(record.attributeName) &&
-                (dialogRoots.has(target) || target.matches(DIALOG_SURFACE_SELECTOR) || record.attributeName === "role")) {
+                (dialogRoots.has(target) || target.matches(DIALOG_SURFACE_SELECTOR))) {
               glassRoots.add(target);
             }
             // Expanded Unified search transfers the fill from the input to its parent.
@@ -532,22 +638,16 @@
             }
           }
         }
-        if (record.type === "attributes" && record.attributeName === "style" &&
-            (target.closest(HOMEPAGE_SCOPE_SELECTOR) ||
-              target.closest("ytd-masthead, ytd-feed-filter-chip-bar-renderer"))) {
+        if (record.type === "attributes" && record.attributeName === "style") {
           enforceHomepageStyle(target);
         }
         if (record.type === "attributes" && record.attributeName === "class" &&
             (target.hasAttribute(AMBIENT_BLOCKED_ATTR) || /cinematic|ambient/i.test(target.className))) {
-          scheduleAmbientBlocker();
+          scheduleAmbientBlocker(target);
         }
       }
       if (addedNodes) scheduleHomepageSync();
       if (glassRoots.size || glassElements.size || removedGlassNodes) scheduleGlassUpdate();
-      if (addedNodes) {
-        scheduleAmbientBlocker();
-        scheduleLiveChatSurfaces();
-      }
     }
 
     function dispose() {
@@ -558,9 +658,12 @@
       clearTimeout(homepageTimer);
       glassRoots.clear();
       glassElements.clear();
+      ambientRoots.clear();
+      chatRoots.clear();
       restoreStore(glassStyles, [UNIVERSAL_GLASS_ATTR, UNIVERSAL_GLASS_CLEAR_ATTR]);
       restoreStore(homepageStyles);
       document.documentElement.removeAttribute("data-ytc-home-glass");
+      document.documentElement.removeAttribute(LIBRARY_ATTR);
       document.querySelectorAll("[" + AMBIENT_BLOCKED_ATTR + "]").forEach(element =>
         element.removeAttribute(AMBIENT_BLOCKED_ATTR)
       );
@@ -570,6 +673,73 @@
   }
 
   runtime.createSurfaceController = createSurfaceController;
+  function buildLibrarySurfaceCss() {
+    return `
+      /* Give each library group and row its own rounded surface; retain native grids and list order. */
+      html[data-ytc-theme] :is(${LIBRARY_PANEL_SELECTOR}, ${LIBRARY_CARD_SELECTOR},
+        ${LIBRARY_HEADER_SELECTOR}, ${LIBRARY_HISTORY_CONTROLS_SELECTOR}) {
+        box-sizing: border-box !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        border-radius: 16px !important;
+      }
+      html[data-ytc-theme] :is(${LIBRARY_PANEL_SELECTOR}, ${LIBRARY_HISTORY_CONTROLS_SELECTOR}) {
+        padding: 12px !important;
+        margin-bottom: 16px !important;
+      }
+      html[data-ytc-theme] :is(${LIBRARY_CARD_SELECTOR}) {
+        padding: 10px !important;
+      }
+      html[data-ytc-theme][${LIBRARY_ATTR}] ytd-browse:not([hidden]) ytd-playlist-video-renderer {
+        height: auto !important;
+      }
+      html[data-ytc-theme] :is(${LIBRARY_HEADER_SELECTOR}) {
+        padding: 12px !important;
+        margin-bottom: 12px !important;
+      }
+      html[data-ytc-theme][${LIBRARY_ATTR}] :is(ytd-tabbed-page-header, yt-page-header-view-model) {
+        border-radius: 16px !important;
+      }
+      html[data-ytc-theme] :is(${LIBRARY_CARD_SELECTOR})
+        :is(ytd-thumbnail, yt-thumbnail-view-model, yt-collection-thumbnail-view-model,
+          .ytLockupViewModelContentImage, .yt-lockup-view-model-wiz__content-image,
+          .shortsLockupViewModelHostThumbnailParentContainer) {
+        max-width: 100% !important;
+        border-radius: 12px !important;
+        overflow: hidden !important;
+      }
+      html[data-ytc-theme] :is(${LIBRARY_CARD_SELECTOR})
+        :is(yt-lockup-view-model > .ytLockupViewModelHost,
+          ytm-shorts-lockup-view-model-v2 > ytm-shorts-lockup-view-model) {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+      }
+      html[data-ytc-theme] :is(${LIBRARY_CARD_SELECTOR})
+        :is(.ytLockupMetadataViewModelMenuButton, .yt-lockup-metadata-view-model-wiz__menu-button,
+          .yt-lockup-metadata-view-model__menu-button) {
+        translate: -6px 0 !important;
+      }
+      html[data-ytc-theme] :is(${LIBRARY_CARD_SELECTOR})
+        .ytLockupMetadataViewModelHasMenuButton .ytLockupMetadataViewModelTextContainer {
+        box-sizing: border-box !important;
+        min-width: 0 !important;
+        padding-inline-end: 36px !important;
+      }
+      html[data-ytc-theme] :is(${LIBRARY_CARD_SELECTOR})
+        .ytLockupMetadataViewModelHasMenuButton .ytLockupMetadataViewModelTitle {
+        padding-inline-end: 0 !important;
+      }
+      html[data-ytc-theme][${LIBRARY_ATTR}] :is(ytd-playlist-header-renderer,
+        ytd-playlist-sidebar-renderer) #background::before,
+      html[data-ytc-theme][${LIBRARY_ATTR}] :is(ytd-playlist-header-renderer,
+        ytd-playlist-sidebar-renderer) #background::after {
+        background: transparent !important;
+        box-shadow: none !important;
+        backdrop-filter: none !important;
+      }
+    `;
+  }
   function buildChannelSurfaceCss() {
     const channel = 'html[data-ytc-theme] ' + CHANNEL_SCOPE_SELECTOR;
     const videoGridCard = channel + ' ytd-rich-grid-renderer ytd-rich-item-renderer:not([is-slim-media])';
@@ -830,6 +1000,7 @@
       backdrop-filter: none !important;
     }
     ${buildChannelSurfaceCss()}
+    ${buildLibrarySurfaceCss()}
   `;
   runtime.surfaceVersion = YTCustomizer.version;
 })();

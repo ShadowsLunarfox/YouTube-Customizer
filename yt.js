@@ -2,10 +2,11 @@
 (() => {
   const {
     version: SCRIPT_VERSION, defaults: DEFAULT_SETTINGS, assetDefaults,
-    normalize, normalizeAssets, iconDataUri
+    audioKeys, normalize, normalizeAssets, iconDataUri
   } = YTCustomizer;
   const runtime = globalThis.YTCustomizerContent;
-  if (!runtime?.createSurfaceController || !runtime?.createShortsController) return;
+  if (!runtime?.createSurfaceController || !runtime?.createShortsController ||
+      !runtime?.createHomeShortsGridController || !runtime?.createAudioController) return;
 
   const INSTANCE_KEY = "__ytProgressCustomizer";
   const previous = globalThis[INSTANCE_KEY];
@@ -150,7 +151,8 @@
         return;
       }
     }
-    if (!backgroundVideo.isConnected) document.body.prepend(backgroundVideo);
+    // Keep YouTube's media ahead of the wallpaper for code that finds the first video.
+    if (!backgroundVideo.isConnected) document.body.append(backgroundVideo);
     if (document.hidden) backgroundVideo.pause();
     else if (backgroundVideo.paused) void backgroundVideo.play().catch(() => {});
   }
@@ -224,6 +226,21 @@
 
       html body .ytp-load-progress,
       html body .ytp-progress-list .ytp-load-progress { background: ${settings.bufferColor} !important; }
+
+      /* Preserve the native replay graph's clipping, fading, and hover behavior. */
+      html body .html5-video-player .ytp-heat-map-container
+        :is(.ytp-heat-map-path, .ytp-heat-map-graph, .ytp-heat-map-hover) {
+        fill: ${settings.heatmapColor} !important;
+      }
+      html body .html5-video-player.ytp-heat-map-played_bar .ytp-heat-map-hover {
+        fill: ${rgba(settings.heatmapColor, 0.5)} !important;
+      }
+      html body .html5-video-player .ytp-heat-map-container .ytp-modern-heat-map {
+        stroke: ${settings.heatmapColor} !important;
+      }
+      html body .html5-video-player .ytp-heat-map-container #ytp-heat-map-gradient-def stop {
+        stop-color: ${settings.heatmapColor} !important;
+      }
 
       html body .ytp-progress-list {
         height: ${settings.barHeight}px !important;
@@ -653,38 +670,11 @@
         }
       }
     `).join("\n");
-    // Shorts shelves size cards independently of the regular rich-grid columns.
-    const shortsShelf = "html body grid-shelf-view-model:has(ytm-shorts-lockup-view-model, ytm-shorts-lockup-view-model-v2)";
-    const legacyShorts = "html body ytd-rich-shelf-renderer[is-shorts] > #dismissible > #contents-container > #contents";
-    const homeShorts = home + ' grid-shelf-view-model:not([hidden], .ytGridShelfViewModelHostIsDismissed)' +
-      ':has(ytm-shorts-lockup-view-model, ytm-shorts-lockup-view-model-v2)';
-    const homeLegacyShorts = home + ' ytd-rich-shelf-renderer[is-shorts] > #dismissible > #contents-container > #contents';
-    // Modern shelves pre-group cards into rows; flatten those rows into one grid.
-    const homeShortsRows = `:is(${homeShorts}:has(> .ytGridShelfViewModelGridShelfRow),
-      ${homeShorts} :has(> .ytGridShelfViewModelGridShelfRow))`;
+    // Home Shorts use the structural controller; other pages retain their shelf rules.
+    const outsideHome = ':not(ytd-browse[page-subtype="home"] *)';
+    const shortsShelf = `html body grid-shelf-view-model${outsideHome}:has(ytm-shorts-lockup-view-model, ytm-shorts-lockup-view-model-v2)`;
+    const legacyShorts = `html body ytd-rich-shelf-renderer[is-shorts]${outsideHome} > #dismissible > #contents-container > #contents`;
     const shortsGap = 16;
-    const homeShortsCss = settings.hideShorts ? "" : `
-      /* Home Shorts use the same effective column count as regular videos. */
-      ${homeShortsRows}, ${homeLegacyShorts} {
-        display: grid !important;
-        grid-template-columns: repeat(var(--ytc-grid-columns), minmax(0, 1fr)) !important;
-        gap: ${shortsGap}px !important;
-      }
-      ${homeShortsRows} > .ytGridShelfViewModelGridShelfRow:not([hidden]) {
-        display: contents !important;
-      }
-      ${homeShortsRows} > :not(.ytGridShelfViewModelGridShelfRow),
-      ${homeLegacyShorts} > grid-shelf-view-model {
-        grid-column: 1 / -1 !important;
-      }
-      ${homeShorts} :is(ytm-shorts-lockup-view-model, ytm-shorts-lockup-view-model-v2),
-      ${home} ytd-rich-shelf-renderer[is-shorts] ytd-rich-grid-slim-media {
-        box-sizing: border-box !important;
-        width: 100% !important;
-        min-width: 0 !important;
-        max-width: 100% !important;
-      }
-    `;
     return `
       ${home},
       html body ytd-rich-grid-renderer,
@@ -692,12 +682,15 @@
         --ytc-grid-columns: ${settings.videosPerRow};
         --ytd-rich-grid-items-per-row: var(--ytc-grid-columns) !important;
         --ytd-rich-grid-posts-per-row: var(--ytc-grid-columns) !important;
-        --ytd-rich-grid-slim-items-per-row: var(--ytc-grid-columns) !important;
         --ytd-rich-grid-game-cards-per-row: var(--ytc-grid-columns) !important;
         --ytd-rich-grid-mini-game-cards-per-row: var(--ytc-grid-columns) !important;
         --ytd-rich-grid-channel-items-per-row: var(--ytc-grid-columns) !important;
         --ytd-rich-grid-item-min-width: 0px !important;
         --ytd-rich-grid-item-margin: 12px !important;
+      }
+      html body ytd-rich-grid-renderer${outsideHome},
+      html body ytd-rich-grid-renderer #contents${outsideHome} {
+        --ytd-rich-grid-slim-items-per-row: var(--ytc-grid-columns) !important;
       }
       /* Keep the column count within the setting without shrinking cards on narrow windows. */
       @media (max-width: 1023px) {
@@ -746,7 +739,6 @@
         max-width: none !important;
         margin-inline: 0 !important;
       }
-      ${homeShortsCss}
     `;
   }
 
@@ -799,14 +791,17 @@
 
   const surfaces = runtime.createSurfaceController();
   const shorts = runtime.createShortsController(() => surfaces.scheduleUniversalGlass(true));
+  const homeShortsGrid = runtime.createHomeShortsGridController();
+  const audio = runtime.createAudioController();
 
   function applyStyles(settings, assets = currentAssets) {
     if (disposed) return;
     const nextSettings = normalize(settings);
     const assetsUnchanged = Object.keys(assetDefaults).every(key => assets[key] === currentAssets[key]);
     const surfaceTokensOnly = stylesApplied && styleEl?.isConnected && assetsUnchanged &&
-      Object.keys(DEFAULT_SETTINGS).every(key => ["uiOpacity", "uiBlur"].includes(key) || nextSettings[key] === currentSettings[key]);
+      Object.keys(DEFAULT_SETTINGS).every(key => ["uiOpacity", "uiBlur", ...audioKeys].includes(key) || nextSettings[key] === currentSettings[key]);
     currentSettings = nextSettings;
+    audio.sync(currentSettings);
     if (!assetsUnchanged) currentAssets = normalizeAssets(assets);
     // Sliders update inherited tokens without surface scans or replacing the main stylesheet.
     const surfaceTokens = {
@@ -841,13 +836,14 @@
     const css = buildPlayerCss(currentSettings, currentAssets.customIconData) +
       buildAppearanceCss(currentSettings, currentAssets) +
       (runtime.buildHomepageGlassCss?.() || "") + (runtime.buildSurfaceCss?.() || "") + buildLayoutCss(currentSettings) +
-      buildEffectsCss(currentSettings) + buildGridCss(currentSettings);
+      buildEffectsCss(currentSettings) + buildGridCss(currentSettings) + runtime.buildHomeShortsGridCss(currentSettings);
     if (styleEl.textContent !== css) styleEl.textContent = css;
     document.documentElement.toggleAttribute("data-ytc-reduced-effects", currentSettings.reduceAnimations);
     document.documentElement.toggleAttribute("data-ytc-disable-video-previews", currentSettings.disableVideoPreviews);
     stopActiveThumbnailPreviews();
     syncSidebarSections();
     shorts.sync();
+    homeShortsGrid.sync(currentSettings);
     surfaces.apply();
     stylesApplied = true;
   }
@@ -936,7 +932,8 @@
         version: SCRIPT_VERSION,
         applied: Boolean(styleEl?.isConnected),
         hasCustomIcon: Boolean(currentAssets.customIconData),
-        hasBackgroundImage: Boolean(currentAssets.backgroundImageData)
+        hasBackgroundImage: Boolean(currentAssets.backgroundImageData),
+        audioStatus: audio.status
       });
     }).catch(() => sendResponse({ version: SCRIPT_VERSION, applied: false }));
     return true;
@@ -962,6 +959,7 @@
     }
     handlePreviewMutations(records);
     shorts.handleMutations(records);
+    homeShortsGrid.handleMutations(records);
     surfaces.handleMutations(records);
   });
   observer.observe(document.documentElement, {
@@ -972,6 +970,9 @@
   const shortsEvents = ["yt-navigate-finish", "yt-page-data-updated", "fullscreenchange", "visibilitychange", "play", "loadeddata"];
   shortsEvents.forEach(event => document.addEventListener(event, shorts.sync, true));
   document.addEventListener("yt-navigate-finish", surfaces.apply);
+  document.addEventListener("yt-navigate-finish", homeShortsGrid.refresh);
+  document.addEventListener("yt-page-data-updated", homeShortsGrid.refresh);
+  window.addEventListener("popstate", homeShortsGrid.refresh);
   window.addEventListener("popstate", surfaces.apply);
   window.addEventListener("popstate", shorts.sync);
   window.addEventListener("resize", shorts.schedule);
@@ -985,9 +986,14 @@
       observer.disconnect();
       clearTimeout(sidebarTimer);
       shorts.dispose();
+      homeShortsGrid.dispose();
+      audio.dispose();
       surfaces.dispose();
       shortsEvents.forEach(event => document.removeEventListener(event, shorts.sync, true));
       document.removeEventListener("yt-navigate-finish", surfaces.apply);
+      document.removeEventListener("yt-navigate-finish", homeShortsGrid.refresh);
+      document.removeEventListener("yt-page-data-updated", homeShortsGrid.refresh);
+      window.removeEventListener("popstate", homeShortsGrid.refresh);
       window.removeEventListener("popstate", surfaces.apply);
       window.removeEventListener("popstate", shorts.sync);
       window.removeEventListener("resize", shorts.schedule);

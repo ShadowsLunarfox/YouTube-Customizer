@@ -4,10 +4,18 @@
     progressColor: "#ff3366",
     progressEffect: "solid",
     bufferColor: "#7a7a7a",
+    heatmapColor: "#ffffff",
     thumbColor: "#ffffff",
     thumbStyle: "circle",
     barHeight: 5,
     thumbSize: 16,
+    audioEnabled: false,
+    volumeBoost: 100,
+    bassGain: 0,
+    midGain: 0,
+    trebleGain: 0,
+    audioBalance: 0,
+    audioLimiter: true,
     themeEnabled: false,
     pageColor: "#0f0f0f",
     surfaceColor: "#212121",
@@ -50,12 +58,15 @@
     forest: { pageColor: "#13211b", surfaceColor: "#20382d", textColor: "#edf7ee", accentColor: "#86d6a0" },
     classic: { pageColor: "#008080", surfaceColor: "#c0c0c0", textColor: "#000000", accentColor: "#000080" }
   });
+  const audioKeys = Object.freeze(["audioEnabled", "volumeBoost", "bassGain", "midGain", "trebleGain", "audioBalance", "audioLimiter"]);
   const tabKeys = Object.freeze({
     appearance: ["themeEnabled", "pageColor", "surfaceColor", "uiOpacity", "uiBlur", "textColor", "accentColor", "backgroundMode", "backgroundFit", "backgroundOpacity"],
-    player: ["progressColor", "progressEffect", "bufferColor", "thumbColor", "thumbStyle", "barHeight", "thumbSize"],
+    player: ["progressColor", "progressEffect", "bufferColor", "heatmapColor", "thumbColor", "thumbStyle", "barHeight", "thumbSize"],
+    audio: audioKeys,
     layout: ["videosPerRow", "disableVideoPreviews", "hideHomeTopicBar", "hideCreateButton", "hideNotificationsButton", "hideSidebarSubscriptions", "hideSidebarYou", "hideSidebarExplore", "hideSidebarMoreFromYouTube", "hideSidebarReportHistory", "relatedThumbnailWidth", "hideShorts", "hideRelated", "hideComments", "hideChat", "reduceAnimations"]
   });
-  const ranges = { barHeight: [3, 14], thumbSize: [10, 34], backgroundOpacity: [0, 100], uiOpacity: [0, 100], uiBlur: [0, 30], videosPerRow: [2, 6], relatedThumbnailWidth: [72, 168] };
+  const ranges = { barHeight: [3, 14], thumbSize: [10, 34], backgroundOpacity: [0, 100], uiOpacity: [0, 100], uiBlur: [0, 30], videosPerRow: [2, 6], relatedThumbnailWidth: [72, 168],
+    volumeBoost: [100, 500], bassGain: [-12, 12], midGain: [-12, 12], trebleGain: [-12, 12], audioBalance: [-100, 100] };
   const choices = {
     progressEffect: ["solid", "pulse", "shimmer", "rainbow"], thumbStyle: [...Object.keys(shapes), "custom"],
     backgroundMode: ["color", "image"], backgroundFit: ["cover", "contain", "tile"]
@@ -131,7 +142,7 @@
   }
 
   globalThis.YTCustomizer = Object.freeze({
-    version: "81", defaults, assetDefaults, presets, tabKeys, normalize, normalizeAssets,
+    version: "90", defaults, assetDefaults, presets, tabKeys, audioKeys, normalize, normalizeAssets,
     isImageData, isBackgroundData, isYouTubeUrl, iconDataUri
   });
 })();

@@ -1,7 +1,7 @@
 // Connects the settings form to storage and applies live previews to the active YouTube tab.
 const {
   version: SCRIPT_VERSION, defaults: DEFAULT_SETTINGS, assetDefaults, presets, tabKeys,
-  normalize, normalizeAssets, isImageData, isBackgroundData, isYouTubeUrl, iconDataUri
+  audioKeys, normalize, normalizeAssets, isImageData, isBackgroundData, isYouTubeUrl, iconDataUri
 } = YTCustomizer;
 
 const form = document.querySelector("#settings-form");
@@ -62,10 +62,18 @@ function updatePreview() {
   for (const id of ["barHeight", "thumbSize", "backgroundOpacity", "uiOpacity", "uiBlur", "relatedThumbnailWidth"]) {
     document.getElementById(id + "Value").value = settings[id];
   }
+  for (const id of ["volumeBoost", "bassGain", "midGain", "trebleGain"]) {
+    document.getElementById(id + "Value").value = (id !== "volumeBoost" && settings[id] > 0 ? "+" : "") + settings[id];
+  }
+  document.getElementById("audioBalanceValue").value = settings.audioBalance === 0 ? "Center" :
+    (settings.audioBalance < 0 ? "L " : "R ") + Math.abs(settings.audioBalance);
+  for (const key of audioKeys) if (key !== "audioEnabled") fields[key].disabled = !settings.audioEnabled;
+  updateAudioStatus();
   preview.style.setProperty("--progress-color", settings.progressColor);
   preview.dataset.effect = settings.progressEffect;
   preview.dataset.reduceAnimations = String(settings.reduceAnimations);
   preview.style.setProperty("--buffer-color", settings.bufferColor);
+  preview.style.setProperty("--heatmap-color", settings.heatmapColor);
   preview.style.setProperty("--bar-height", settings.barHeight + "px");
   preview.style.setProperty("--thumb-size", settings.thumbSize + "px");
   previewThumb.style.backgroundImage = 'url("' + iconDataUri(settings.thumbStyle, settings.thumbColor, assets.customIconData) + '")';
@@ -131,6 +139,16 @@ function updatePreview() {
   }
 }
 
+function updateAudioStatus(status) {
+  const messages = {
+    active: "Audio settings are active.",
+    unsupported: "This video cannot be processed. Its original audio is preserved.",
+    error: "Audio processing is unavailable for this player."
+  };
+  document.getElementById("audioStatus").textContent = !fields.audioEnabled.checked ? "Audio processing is off." :
+    messages[status] || "Play a video to apply audio settings. Click the video once if needed.";
+}
+
 window.addEventListener("pagehide", () => {
   if (previewImageUrl) URL.revokeObjectURL(previewImageUrl);
 });
@@ -152,7 +170,7 @@ async function connectToCurrentTab() {
   if (response?.version !== SCRIPT_VERSION) {
     await chrome.scripting.executeScript({
       target: { tabId: tab.id, allFrames: true },
-      files: ["settings.js", "content/surface-controller.js", "content/shorts-controller.js", "content/homepage-glass.js", "yt.js"]
+      files: ["settings.js", "content/surface-controller.js", "content/shorts-controller.js", "content/homepage-glass.js", "content/home-shorts-grid.js", "content/audio-controller.js", "yt.js"]
     });
     response = await chrome.tabs.sendMessage(tab.id, { type: "YT_PROGRESS_PING" });
   }
@@ -194,6 +212,7 @@ async function flushLivePreview() {
         throw new Error("Refresh YouTube and try again");
       }
       lastSentAssets = snapshot.assets;
+      updateAudioStatus(response.audioStatus);
       applicationError = "";
       showStatus("Applied");
     }

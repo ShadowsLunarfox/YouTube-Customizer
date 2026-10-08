@@ -277,7 +277,7 @@ const chatFixture = `<!doctype html><html><head><style>
     await verifyOpacity(70);
     await popup.evaluate(async tabId => {
       await chrome.scripting.executeScript({ target: { tabId, allFrames: true },
-        files: ["settings.js", "content/surface-controller.js", "content/shorts-controller.js", "content/homepage-glass.js", "yt.js"] });
+        files: ["settings.js", "content/surface-controller.js", "content/shorts-controller.js", "content/homepage-glass.js", "content/home-shorts-grid.js", "content/audio-controller.js", "yt.js"] });
     }, tabId);
     await verifyOpacity(70);
     assert.equal(await page.locator("#yt-custom-progress-style").count(), 1);

@@ -8,6 +8,11 @@
     'ytd-rich-shelf-renderer[has-paygated-featured-badge]:not([is-shorts])';
   const featuredShelf = `:is(${topicsShelf}, ${membershipsShelf})`;
   const videoShelf = `:is(${topicsShelf} ytd-rich-shelf-renderer, ${membershipsShelf})`;
+  // Hover players can live inside the feed before moving into a preview portal.
+  // Their controls and progress layers need their native backgrounds immediately.
+  const clearContent = ':where(:not(.html5-video-player, .html5-video-player *, ' +
+    '#inline-player, #inline-player *, #inline-preview-player, #inline-preview-player *, ' +
+    '[data-ytc-home-shorts-toggle]))';
 
   runtime.buildHomepageGlassCss = () => `
     /* Inset the thumbnail and metadata within each rounded Home card. */
@@ -254,9 +259,9 @@
       box-shadow: none !important;
     }
 
-    html[data-ytc-home-glass] ytd-browse[page-subtype="home"] :where(*),
-    html[data-ytc-home-glass] ytd-masthead :where(*),
-    html[data-ytc-home-glass] ytd-feed-filter-chip-bar-renderer :where(*) {
+    html[data-ytc-home-glass] ytd-browse[page-subtype="home"] ${clearContent},
+    html[data-ytc-home-glass] ytd-masthead ${clearContent},
+    html[data-ytc-home-glass] ytd-feed-filter-chip-bar-renderer ${clearContent} {
       background-color: transparent !important;
       box-shadow: none !important;
     }
@@ -272,8 +277,8 @@
     html[data-ytc-home-glass] :is(ytd-masthead #background,
       ytd-masthead #masthead-container)::after,
     html[data-ytc-home-glass] ytd-masthead #gradient,
-    html[data-ytc-home-glass] ytd-browse[page-subtype="home"] :where(*)::before,
-    html[data-ytc-home-glass] ytd-browse[page-subtype="home"] :where(*)::after {
+    html[data-ytc-home-glass] ytd-browse[page-subtype="home"] ${clearContent}::before,
+    html[data-ytc-home-glass] ytd-browse[page-subtype="home"] ${clearContent}::after {
       background: transparent !important;
       background-image: none !important;
       box-shadow: none !important;

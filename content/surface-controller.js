@@ -57,7 +57,16 @@
   const TOPICS_SHELF_SELECTOR = 'ytd-browse[page-subtype="home"] ' +
     ':is(ytd-chips-shelf-with-video-shelf-renderer, .ytdChipsShelfWithVideoShelfRendererHost)';
   const MEMBERSHIPS_SHELF_SELECTOR = 'ytd-browse[page-subtype="home"] ' +
-    'ytd-rich-shelf-renderer[has-paygated-featured-badge]:not([is-shorts])';
+    'ytd-rich-shelf-renderer:not([is-shorts]):is([has-paygated-featured-badge], ' +
+    ':has(#rich-shelf-header #paygated-featured-badge:not([hidden])))';
+  runtime.membershipsShelfSelector = MEMBERSHIPS_SHELF_SELECTOR;
+  const MEMBERSHIPS_PAGE_SELECTOR = 'ytd-browse[page-subtype="channel-memberships-shopfront"]:not([hidden])';
+  const MEMBERSHIPS_PAGE_HERO_SELECTOR = MEMBERSHIPS_PAGE_SELECTOR + ' yt-sponsorships-destination-hub-header-view-model';
+  const MEMBERSHIPS_PAGE_CARD_SELECTOR = MEMBERSHIPS_PAGE_SELECTOR + ' .ytLockupViewModelHost';
+  const MEMBERSHIPS_PAGE_TITLE_SELECTOR = MEMBERSHIPS_PAGE_SELECTOR + ' :is(ytd-shelf-renderer #title-text, .ytShelfHeaderLayoutTitle)';
+  const MEMBERSHIPS_PAGE_CLEAR_SELECTOR = MEMBERSHIPS_PAGE_SELECTOR + ' :is(ytd-item-section-renderer, ' +
+    'ytd-shelf-renderer, horizontal-shelf-view-model, yt-lockup-view-model, ' +
+    '.ytLockupViewModelMetadata, yt-lockup-metadata-view-model)';
   const SEARCH_SHORTS_SHELF_SELECTOR = 'ytd-search :is(ytd-reel-shelf-renderer, ' +
     'grid-shelf-view-model:not(ytd-reel-shelf-renderer *):has(' +
     'ytm-shorts-lockup-view-model, ytm-shorts-lockup-view-model-v2))';
@@ -117,11 +126,13 @@
     "ytd-guide-renderer #guide-inner-content", "ytd-mini-guide-renderer #guide-content",
     "ytd-feed-filter-chip-bar-renderer", "ytd-feed-filter-chip-bar-renderer #chips-wrapper",
     "yt-chip-cloud-renderer", "ytd-guide-entry-renderer", "ytd-mini-guide-entry-renderer",
+    "ytd-guide-renderer #footer",
     "yt-chip-cloud-chip-renderer", "yt-chip-cloud-chip-renderer #chip-container",
     ".ytChipShapeChip", ".ytSpecTouchFeedbackShapeFill", ".ytSpecButtonShapeNextHost",
     "ytd-rich-item-renderer", "ytd-rich-section-renderer", "ytd-rich-shelf-renderer", "ytd-watch-metadata #description",
     TOPICS_SHELF_SELECTOR, TOPICS_SHELF_SELECTOR + " button",
     MEMBERSHIPS_SHELF_SELECTOR + " button",
+    MEMBERSHIPS_PAGE_HERO_SELECTOR, MEMBERSHIPS_PAGE_CARD_SELECTOR, MEMBERSHIPS_PAGE_TITLE_SELECTOR,
     SEARCH_SHORTS_SHELF_SELECTOR, SEARCH_SHORTS_CARD_SELECTOR,
     "ytd-video-renderer", "ytd-compact-video-renderer", "yt-lockup-view-model",
     "ytd-search ytd-channel-renderer",
@@ -151,7 +162,7 @@
     "ytd-masthead #center", "ytd-masthead #container", "ytd-masthead #background",
     "ytd-masthead #masthead-container", "ytd-masthead #search", "ytd-masthead yt-searchbox",
     "ytd-guide-renderer #guide", "ytd-guide-renderer #guide-inner-content", "ytd-guide-renderer #sections",
-    "ytd-guide-renderer #footer", "ytd-mini-guide-renderer #guide-content", "ytd-mini-guide-renderer #items",
+    "ytd-mini-guide-renderer #guide-content", "ytd-mini-guide-renderer #items",
     "ytd-multi-page-menu-renderer > #header",
     "ytd-multi-page-menu-renderer > #header ytd-simple-menu-header-renderer",
     "ytd-feed-filter-chip-bar-renderer:has(#chips-wrapper)", "ytd-feed-filter-chip-bar-renderer yt-chip-cloud-renderer",
@@ -160,6 +171,7 @@
     TOPICS_SHELF_SELECTOR + " ytd-rich-shelf-renderer",
     TOPICS_SHELF_SELECTOR + " ytd-rich-shelf-renderer .button-container",
     MEMBERSHIPS_SHELF_SELECTOR + " > #dismissible > .button-container",
+    MEMBERSHIPS_PAGE_CLEAR_SELECTOR,
     SEARCH_SHORTS_FOOTER_SELECTOR,
     // Blur on the outer header moves its fixed descendants into a new containing block.
     CHANNEL_SCOPE_SELECTOR + ' :is(ytd-tabbed-page-header, ytd-c4-tabbed-header-renderer)',
@@ -241,6 +253,7 @@
     .ytChipShapeChip, ytd-guide-entry-renderer, ytd-mini-guide-entry-renderer),
     ${TOPICS_SHELF_SELECTOR} button,
     ${MEMBERSHIPS_SHELF_SELECTOR} :is(ytd-rich-item-renderer, yt-lockup-view-model, button),
+    ytd-guide-renderer #footer,
     ${SEARCH_SHORTS_CARD_SELECTOR},
     ${SEARCH_SHORTS_SHELF_SELECTOR} .ytSpecButtonShapeNextHost,
     ${CHANNEL_PANEL_SELECTOR} :is(${CHANNEL_CARD_TYPES}),
@@ -400,7 +413,7 @@
       candidates.forEach(element => {
         const name = (element.id + " " + (typeof element.className === "string" ? element.className : "")).toLowerCase();
         // Collection artwork uses "Cinematic" too; it is content, not an ambient layer.
-        const media = element.matches("img, video") || element.closest(
+        const media = element.matches("img, video, yt-lockup-view-model, .ytLockupViewModelHost") || element.closest(
           "ytd-thumbnail, yt-thumbnail-view-model, yt-collection-thumbnail-view-model, yt-image-banner-view-model"
         );
         if (!media && /cinematic|ambient/.test(name)) element.setAttribute(AMBIENT_BLOCKED_ATTR, "");
@@ -619,6 +632,12 @@
             // A grid shelf becomes a Shorts surface when its first card arrives.
             const searchShelf = target.closest("ytd-search grid-shelf-view-model");
             if (searchShelf) glassElements.add(searchShelf);
+            // The badge can arrive after the cards, before its host reflects an attribute.
+            if (target.closest("#rich-shelf-header") ||
+                [...record.addedNodes, ...record.removedNodes].some(node => node.id === "rich-shelf-header")) {
+              const shelf = target.closest("ytd-rich-shelf-renderer");
+              if (shelf) glassRoots.add(shelf);
+            }
           }
         } else if (glassEnabled() && (glassStyles.has(target) || mightBeGlassElement(target))) {
           if (record.attributeName === "style") {
@@ -646,6 +665,10 @@
             if (["has-paygated-featured-badge", "is-shorts"].includes(record.attributeName) &&
                 target.matches("ytd-rich-shelf-renderer")) {
               glassRoots.add(target);
+            }
+            if (record.attributeName === "hidden" && target.id === "paygated-featured-badge") {
+              const shelf = target.closest("ytd-rich-shelf-renderer");
+              if (shelf) glassRoots.add(shelf);
             }
           }
         }
@@ -911,6 +934,238 @@
       }
     `;
   }
+  function buildMembershipsPageCss() {
+    const page = 'html[data-ytc-theme] ' + MEMBERSHIPS_PAGE_SELECTOR;
+    return `
+      ${page} {
+        --ytc-memberships-text: var(--yt-spec-text-primary);
+        --ytc-memberships-muted: var(--yt-spec-text-secondary);
+        --ytc-memberships-accent: var(--yt-spec-call-to-action);
+        --ytc-memberships-edge: color-mix(in srgb, var(--yt-spec-text-primary) 22%, transparent);
+      }
+      ${page} :is(ytd-two-column-browse-results-renderer, ytd-section-list-renderer,
+        ytd-item-section-renderer, horizontal-shelf-view-model, ytd-shelf-renderer) {
+        min-width: 0 !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+      }
+      ${page} yt-sponsorships-destination-hub-header-view-model {
+        box-sizing: border-box !important;
+        padding: 24px !important;
+        margin-block: 20px !important;
+        border: 1px solid var(--ytc-memberships-edge) !important;
+        border-inline-start: 3px solid var(--ytc-memberships-accent) !important;
+        border-radius: 20px !important;
+        color: var(--ytc-memberships-text) !important;
+      }
+      ${page} .ytSponsorshipsDestinationHubHeaderViewModelHeader {
+        gap: 16px !important;
+        align-items: center !important;
+      }
+      ${page} .ytSponsorshipsDestinationHubHeaderViewModelImage {
+        width: 56px !important;
+        height: 56px !important;
+        flex: 0 0 56px !important;
+        margin: 0 !important;
+      }
+      ${page} .ytSponsorshipsDestinationHubHeaderViewModelTitle {
+        font-size: clamp(28px, 3vw, 38px) !important;
+        line-height: 1.2 !important;
+        font-weight: 700 !important;
+        min-width: 0;
+        overflow-wrap: anywhere;
+        color: var(--ytc-memberships-text) !important;
+      }
+      ${page} .ytSponsorshipsDestinationHubHeaderViewModelSubtitle {
+        margin-top: 12px !important;
+        max-width: 80ch;
+        font-size: 14px !important;
+        line-height: 1.6 !important;
+        color: var(--ytc-memberships-muted) !important;
+      }
+      ${page} .ytSponsorshipsDestinationHubHeaderViewModelSubtitle a {
+        color: var(--ytc-memberships-accent) !important;
+        white-space: nowrap;
+      }
+      /* Wrap the existing filters; their native selected state and requests survive. */
+      ${page} :is(chips-shelf-view-model, .ytChipsShelfViewModelChipsShelfContent,
+        .ytChipsShelfViewModelChipsScrollContainer) {
+        height: auto !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        overflow: visible !important;
+      }
+      ${page} .ytChipsShelfViewModelChipsContainer {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 8px !important;
+        height: auto !important;
+        transform: none !important;
+      }
+      ${page} .ytChipsShelfViewModelChipWrapper { margin: 0 !important; max-width: 100%; }
+      ${page} :is(.ytChipsShelfViewModelLeftArrowContainer, .ytChipsShelfViewModelRightArrowContainer) {
+        display: none !important;
+      }
+      ${page} .ytChipShapeChip {
+        box-sizing: border-box;
+        min-height: 36px;
+        border: 1px solid var(--ytc-memberships-edge);
+        border-radius: 999px !important;
+        color: var(--ytc-memberships-text) !important;
+      }
+      ${page} [aria-selected="true"] .ytChipShapeChip {
+        border-color: var(--ytc-memberships-accent) !important;
+        outline: 1px solid var(--ytc-memberships-accent);
+        outline-offset: -1px;
+      }
+      ${page} :is(horizontal-shelf-view-model, ytd-shelf-renderer) {
+        margin-block: 8px 28px !important;
+      }
+      ${page} :is(ytd-shelf-renderer #title-text, .ytShelfHeaderLayoutTitle) {
+        display: inline-block !important;
+        width: fit-content !important;
+        max-width: 100%;
+        box-sizing: border-box;
+        margin: 0 !important;
+        padding: 6px 12px !important;
+        border: 1px solid var(--ytc-memberships-edge);
+        border-radius: 12px;
+        font-size: 20px !important;
+        line-height: 1.4 !important;
+        color: var(--ytc-memberships-text) !important;
+      }
+      ${page} .ytShelfHeaderLayoutHeaderRow { height: auto !important; align-items: center !important; }
+      ${page} ytd-shelf-renderer #title { color: var(--ytc-memberships-text) !important; }
+      ${page} :is(.ytwHorizontalShelfViewModelHeader, ytd-shelf-renderer .grid-subheader) {
+        padding-block: 0 12px !important;
+      }
+      /* Style the inner card that owns the thumbnail and metadata. */
+      ${page} .ytLockupViewModelHost {
+        box-sizing: border-box !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        padding: 10px !important;
+        border: 1px solid var(--ytc-memberships-edge) !important;
+        border-radius: 16px !important;
+        height: auto !important;
+        align-self: stretch !important;
+        color: var(--ytc-memberships-text) !important;
+      }
+      ${page} :is(.ytLockupViewModelContentImage, yt-thumbnail-view-model) {
+        width: 100% !important;
+        border-radius: 10px !important;
+        overflow: hidden !important;
+      }
+      ${page} .ytLockupMetadataViewModelTitle { color: var(--ytc-memberships-text) !important; }
+      ${page} .ytContentMetadataViewModelMetadataText { color: var(--ytc-memberships-muted) !important; }
+      ${page} .ytLockupMetadataViewModelHasMenuButton .ytLockupMetadataViewModelTextContainer {
+        flex: 1 !important;
+        min-width: 0 !important;
+        padding-inline-end: 0 !important;
+      }
+      ${page} .ytLockupMetadataViewModelHasMenuButton .ytLockupMetadataViewModelTitle {
+        padding-inline-end: 0 !important;
+      }
+      ${page} .ytLockupMetadataViewModelHasMenuButton .ytLockupMetadataViewModelMenuButton {
+        position: static !important;
+        translate: none !important;
+        transform: none !important;
+        flex: 0 0 32px !important;
+        margin: 0 0 0 6px !important;
+      }
+      ${page} .ytLockupMetadataViewModelMenuButton button { color: var(--ytc-memberships-text) !important; }
+      /* Move creator names/prices below the art rather than over a black gradient. */
+      ${page} .ytLockupViewModelMetadataOnThumbnail {
+        display: flex !important;
+        flex-direction: column !important;
+        aspect-ratio: auto !important;
+        gap: 0 !important;
+      }
+      ${page} .ytLockupViewModelMetadataOnThumbnail .ytLockupViewModelMetadata {
+        position: static !important;
+        inset: auto !important;
+        padding: 12px 0 0 !important;
+        width: 100% !important;
+        height: auto !important;
+        min-height: 0 !important;
+      }
+      ${page} .ytLockupViewModelMetadataOnThumbnail .ytLockupViewModelContentImage {
+        flex: none !important;
+        height: auto !important;
+      }
+      ${page} .ytLockupViewModelMetadataOnThumbnail yt-thumbnail-view-model {
+        height: auto !important;
+        padding: 0 !important;
+        aspect-ratio: 4 / 3 !important;
+      }
+      ${page} .ytLockupViewModelMetadataOnThumbnail .ytThumbnailViewModelImage img { object-fit: cover !important; }
+      ${page} .ytLockupMetadataViewModelOverlay {
+        position: static !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        height: auto !important;
+        min-height: 0 !important;
+        color: var(--ytc-memberships-text) !important;
+      }
+      ${page} .ytLockupMetadataViewModelOverlay .ytLockupMetadataViewModelAvatar { margin: 0 0 8px !important; }
+      ${page} .ytLockupMetadataViewModelOverlay .ytLockupMetadataViewModelTitle {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        min-height: 2.8em;
+        line-height: 1.4 !important;
+      }
+      ${page} :is(.ytwHorizontalShelfViewModelItems, yt-horizontal-list-renderer #items) {
+        align-items: stretch !important;
+      }
+      ${page} yt-horizontal-list-renderer #items { display: flex !important; width: max-content !important; }
+      ${page} yt-horizontal-list-renderer #items > yt-lockup-view-model {
+        display: flex !important;
+        flex-direction: column !important;
+        flex: none !important;
+        align-self: stretch !important;
+        height: auto !important;
+        margin-inline-end: 12px !important;
+      }
+      ${page} yt-horizontal-list-renderer #items > yt-lockup-view-model > .ytLockupViewModelHost { flex: 1 !important; }
+      ${page} .ytwHorizontalShelfViewModelItems > div { display: flex !important; align-self: stretch !important; }
+      ${page} .ytwHorizontalShelfViewModelItems > div > yt-lockup-view-model {
+        display: flex !important;
+        width: 100% !important;
+        min-width: 0 !important;
+      }
+      ${page} .ytwHorizontalShelfViewModelItems .ytLockupViewModelHost { width: 100% !important; }
+      ${page} :is(.ytwHorizontalShelfViewModelRightArrow, .ytwHorizontalShelfViewModelLeftArrow) {
+        background: var(--ytc-universal-glass) !important;
+        border: 1px solid var(--ytc-memberships-edge);
+        border-radius: 50%;
+      }
+      ${page} :is(.ytwHorizontalShelfViewModelRightArrow, .ytwHorizontalShelfViewModelLeftArrow,
+        yt-horizontal-list-renderer #right-arrow, yt-horizontal-list-renderer #left-arrow) button {
+        color: var(--ytc-memberships-text) !important;
+        border: 1px solid var(--ytc-memberships-edge);
+        border-radius: 50%;
+      }
+      ${page} :is(button, a):focus-visible {
+        outline: 2px solid var(--ytc-memberships-accent);
+        outline-offset: 2px;
+      }
+      @media (max-width: 816px) {
+        ${page} ytd-two-column-browse-results-renderer {
+          width: calc(100% - 32px) !important;
+          margin-inline: auto !important;
+        }
+        ${page} :is(ytd-two-column-browse-results-renderer > #primary, ytd-section-list-renderer) {
+          width: 100% !important;
+        }
+      }
+      @media (max-width: 600px) {
+        ${page} yt-sponsorships-destination-hub-header-view-model { padding: 16px !important; }
+        ${page} .ytSponsorshipsDestinationHubHeaderViewModelImage { width: 44px !important; height: 44px !important; flex-basis: 44px !important; }
+      }
+    `;
+  }
   // Share the same targets with CSS so new UI surfaces are styled before the observer runs.
   runtime.buildSurfaceCss = () => `
     /* Named view-transition surfaces prevent descendants from sampling the wallpaper in Chrome. */
@@ -1029,6 +1284,7 @@
     }
     ${buildChannelSurfaceCss()}
     ${buildLibrarySurfaceCss()}
+    ${buildMembershipsPageCss()}
   `;
   runtime.surfaceVersion = YTCustomizer.version;
 })();

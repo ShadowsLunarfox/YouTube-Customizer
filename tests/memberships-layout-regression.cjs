@@ -15,7 +15,7 @@ function card(index, modern) {
   const button = `<button class="ytSpecButtonShapeNextHost more" aria-label="More actions for video ${index}">⋮</button>`;
   const classicMenu = `<ytd-menu-renderer>${button}</ytd-menu-renderer>`;
   const inner = modern
-    ? `<yt-lockup-view-model class="ytLockupViewModelHost ytLockupViewModelVertical">${thumbnail}<yt-lockup-metadata-view-model class="ytLockupMetadataViewModelHost ytLockupMetadataViewModelHasMenuButton">${avatar}<div class="ytLockupMetadataViewModelTextContainer" data-text>${text}</div><div class="ytLockupMetadataViewModelMenuButton">${button}</div></yt-lockup-metadata-view-model></yt-lockup-view-model>`
+    ? `<yt-lockup-view-model><div class="ytLockupViewModelHost ytLockupViewModelVertical">${thumbnail}<yt-lockup-metadata-view-model class="ytLockupMetadataViewModelHost ytLockupMetadataViewModelHasMenuButton">${avatar}<div class="ytLockupMetadataViewModelTextContainer" data-text>${text}</div><div class="ytLockupMetadataViewModelMenuButton">${button}</div></yt-lockup-metadata-view-model></div></yt-lockup-view-model>`
     : `<ytd-rich-grid-media>${thumbnail}<div id="details">${avatar}<div id="meta" data-text>${text}</div>${index % 2 ? classicMenu : `<div id="menu">${classicMenu}</div>`}</div></ytd-rich-grid-media>`;
   return `<ytd-rich-item-renderer data-card ${index >= 4 ? "hidden" : ""}><div id="content">${inner}</div></ytd-rich-item-renderer>`;
 }
@@ -32,6 +32,7 @@ function fixture(modern) {
     ytd-rich-item-renderer{display:block;width:calc(100% / var(--ytd-rich-grid-items-per-row,6) - 12px);margin:0 6px 24px}
     ytd-rich-item-renderer>#content{display:block} yt-lockup-view-model{display:flex;flex:1;position:relative;min-width:0}
     .ytLockupViewModelVertical{flex-direction:column} .ytLockupViewModelContentImage{display:block;position:relative;width:100%}
+    yt-lockup-view-model>.ytLockupViewModelHost{display:flex;flex-direction:column;flex:none;width:360px}
     yt-thumbnail-view-model{display:block;aspect-ratio:16/9;width:100%} img.cover{display:block;width:100%;height:100%;object-fit:cover}
     .ytLockupMetadataViewModelHost,#details{display:flex;position:relative;margin-top:12px;min-width:0}
     .avatar{display:block;flex:0 0 36px;width:36px;height:36px;margin-right:12px;border-radius:50%;overflow:hidden}
@@ -49,7 +50,7 @@ function fixture(modern) {
     #popup{display:none;position:fixed;inset:100px auto auto 30%;width:200px;height:100px;z-index:3000;padding:12px} #popup.open{display:block}
   </style></head><body><ytd-app><ytd-browse page-subtype="home"><ytd-rich-grid-renderer>
     <ytd-rich-section-renderer><ytd-rich-shelf-renderer id="memberships" has-paygated-featured-badge has-expansion-button>
-      <div id="dismissible"><div id="rich-shelf-header"><div id="title-container"><h2>Get more from memberships</h2><span id="subtitle">YouTube featured</span><span id="subtitle-text">Enjoy perks like members-only videos and much more</span></div></div>
+      <div id="dismissible"><div id="rich-shelf-header"><div id="title-container"><h2>Get more from memberships</h2><span id="paygated-featured-badge"><span id="subtitle">YouTube featured</span></span><span id="subtitle-text">Enjoy perks like members-only videos and much more</span></div></div>
         <div id="contents-container"><div id="contents" data-grid>${Array.from({length:8},(_,i)=>card(i,modern)).join("")}</div></div>
         <div class="button-container"><button id="show-more" class="ytSpecButtonShapeNextHost">Show more ﹀</button></div>
       </div></ytd-rich-shelf-renderer></ytd-rich-section-renderer>
@@ -65,6 +66,7 @@ async function layout(page) {
     const host=document.querySelector('#memberships');
     return {
       host:rect(host),grid:rect(document.querySelector('[data-grid]')),header:rect(document.querySelector('#rich-shelf-header')),footer:rect(document.querySelector('#show-more')),
+      title:{...rect(host.querySelector('#title-container')),border:getComputedStyle(host.querySelector('#title-container')).borderTopWidth,radius:getComputedStyle(host.querySelector('#title-container')).borderRadius},
       cards:[...host.querySelectorAll('[data-card]')].filter(el=>el.getBoundingClientRect().width>0).map(el=>({
         ...rect(el),thumbnail:rect(el.querySelector('yt-thumbnail-view-model')),text:rect(el.querySelector('[data-text]')),menu:rect(el.querySelector('.more')),avatar:rect(el.querySelector('.avatar')),
         radius:getComputedStyle(el).borderRadius,thumbnailRadius:getComputedStyle(el.querySelector('yt-thumbnail-view-model')).borderRadius,
@@ -83,6 +85,9 @@ function check(state,width,count) {
   assert.equal(state.blur,'blur(12px)');assert.equal(state.footerFill,'rgba(0, 0, 0, 0)','footer shares the panel background');
   assert.equal(state.menuRadius,'999px');
   assert.ok(state.header.x>=state.host.x+12,'header is inset');
+  assert.equal(state.title.border,'1px');assert.equal(state.title.radius,'12px');
+  assert.ok(state.title.width<=state.header.width&&state.title.right<=state.host.right-12,'heading border fits inside the section');
+  if(width>=800)assert.ok(state.title.width<state.header.width*.8,'heading border fits its text on a wide screen');
   assert.ok(state.footer.bottom<=state.host.bottom-12,'Show more stays inside the panel');
   assert.ok(Math.abs((state.footer.x+state.footer.right)/2-(state.host.x+state.host.right)/2)<1,'footer is centered');
   const rows = new Map();
@@ -140,10 +145,29 @@ function check(state,width,count) {
       assert.equal(await page.locator('#memberships').evaluate(el=>getComputedStyle(el).borderTopColor),'rgba(255, 255, 255, 0)','bevel follows opacity');
       await popup.evaluate(()=>chrome.storage.sync.set({uiOpacity:30}));
       await page.waitForFunction(()=>document.documentElement.style.getPropertyValue('--ytc-ui-opacity')==='0.3');
+      await page.locator('#paygated-featured-badge').evaluate(el=>el.hidden=true);
       await page.locator('#memberships').evaluate(el=>el.removeAttribute('has-paygated-featured-badge'));
       await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-card]')).backdropFilter==='blur(12px)');
       await page.locator('#memberships').evaluate(el=>el.setAttribute('has-paygated-featured-badge',''));
       await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-card]')).backdropFilter==='none');check(await layout(page),1880,4);
+      // Some shelves stamp the native badge before reflecting the host flag.
+      await page.locator('#paygated-featured-badge').evaluate(el=>el.hidden=false);
+      await page.locator('#memberships').evaluate(el=>el.removeAttribute('has-paygated-featured-badge'));
+      await page.waitForTimeout(150);check(await layout(page),1880,4);
+      await page.setViewportSize({width:390,height:1000});check(await layout(page),390,4);
+      await page.locator('#show-more').click();check(await layout(page),390,8);
+      await page.locator('#show-more').click();check(await layout(page),390,4);
+      await page.locator('#paygated-featured-badge').evaluate(el=>el.hidden=true);
+      await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-card]')).backdropFilter==='blur(12px)',null,{timeout:3000});
+      assert.equal(await page.locator('#memberships').evaluate(el=>getComputedStyle(el).padding),'0px','a hidden badge does not identify an ordinary shelf');
+      await page.locator('#paygated-featured-badge').evaluate(el=>el.hidden=false);
+      await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-card]')).backdropFilter==='none',null,{timeout:3000});
+      await page.locator('#paygated-featured-badge').evaluate(el=>el.remove());
+      await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-card]')).backdropFilter==='blur(12px)',null,{timeout:3000});
+      await page.locator('#title-container').evaluate(el=>el.insertAdjacentHTML('beforeend','<span id="paygated-featured-badge">YouTube featured</span>'));
+      await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-card]')).backdropFilter==='none',null,{timeout:3000});
+      await page.setViewportSize({width:1880,height:1000});check(await layout(page),1880,4);
+      await page.locator('#memberships').evaluate(el=>el.setAttribute('has-paygated-featured-badge',''));
       await page.locator('#ordinary').evaluate(el=>el.setAttribute('has-paygated-featured-badge',''));
       await page.waitForFunction(()=>document.querySelector('#ordinary').style.backdropFilter==='var(--ytc-ui-backdrop)');
       await page.locator('#ordinary').evaluate(el=>el.removeAttribute('has-paygated-featured-badge'));
@@ -154,6 +178,6 @@ function check(state,width,count) {
       assert.deepEqual(await page.locator('#memberships').evaluate(el=>({padding:getComputedStyle(el).padding,radius:getComputedStyle(el).borderRadius,style:el.getAttribute('style')||''})),original,'disabling restores the native shelf');
     }
     assert.deepEqual(errors,[]);
-    console.log('PASS: classic and modern memberships shelves at 1880/1440/800/390px; rounded bevels, balanced cards, menu clicks, expansion, column settings, wallpaper, opacity, recycled shelves, restoration, and no overflow.');
+    console.log('PASS: classic/nested modern memberships at 1880/1440/800/390px; fitted heading, inset cards, menu clicks, expansion, late/hidden/removed badges, column settings, wallpaper, opacity, recycled shelves, restoration, and no overflow.');
   } finally {clearTimeout(deadline);await context.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

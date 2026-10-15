@@ -4,8 +4,7 @@
   if (runtime.homepageVersion === YTCustomizer.version) return;
   const topicsShelf = 'html[data-ytc-theme] ytd-browse[page-subtype="home"] ' +
     ':is(ytd-chips-shelf-with-video-shelf-renderer, .ytdChipsShelfWithVideoShelfRendererHost)';
-  const membershipsShelf = 'html[data-ytc-theme] ytd-browse[page-subtype="home"] ' +
-    'ytd-rich-shelf-renderer[has-paygated-featured-badge]:not([is-shorts])';
+  const membershipsShelf = 'html[data-ytc-theme] ' + runtime.membershipsShelfSelector;
   const featuredShelf = `:is(${topicsShelf}, ${membershipsShelf})`;
   const videoShelf = `:is(${topicsShelf} ytd-rich-shelf-renderer, ${membershipsShelf})`;
   // Hover players can live inside the feed before moving into a preview portal.
@@ -162,6 +161,15 @@
     ${membershipsShelf} :is(#title-container, #title-text) {
       min-width: 0 !important;
     }
+    ${membershipsShelf} #rich-shelf-header #title-container {
+      box-sizing: border-box !important;
+      flex: 0 1 auto !important;
+      width: fit-content !important;
+      max-width: 100% !important;
+      padding: 8px 12px !important;
+      border: 1px solid var(--ytc-featured-edge-light) !important;
+      border-radius: 12px !important;
+    }
     ${membershipsShelf} #title {
       color: var(--yt-spec-text-primary) !important;
     }
@@ -182,6 +190,12 @@
     ${membershipsShelf} :is(yt-lockup-view-model, ytd-rich-grid-media) {
       width: 100% !important;
       min-width: 0 !important;
+    }
+    /* Modern lockups put their fixed native width on an inner host wrapper. */
+    ${membershipsShelf} yt-lockup-view-model > .ytLockupViewModelHost {
+      width: 100% !important;
+      min-width: 0 !important;
+      max-width: 100% !important;
     }
     /* Reserve a separate menu column so titles, logos, and badges stay readable. */
     ${membershipsShelf} :is(.ytLockupMetadataViewModelTextContainer,

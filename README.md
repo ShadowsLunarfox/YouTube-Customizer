@@ -48,6 +48,7 @@
 - Set Home videos and Shorts to 2–6 items per row, with fewer columns on narrow windows. Disable hover previews or reduce motion.
 - Home Shorts initially show one row. Show more reveals the additional cards; changing the column setting collapses the shelf again.
 - Library pages use rounded panels and cards with the shared theme background, opacity, and blur: History, Playlists, Watch later, Liked videos, Downloads, Courses, and Clips.
+- Channel memberships has a themed header, wrapping topic filters, rounded video and creator cards, and clearly separated section headings. Creator names and prices appear below their artwork.
 - Hide Shorts, the topic filter bar, the Create button, or the notifications button.
 - Independently hide Subscriptions, You, Explore, More from YouTube, and Report history in the sidebar.
 - Adjust related-video thumbnail width, or hide related videos, comments, or live chat.

@@ -382,7 +382,49 @@
         background-image: none !important;
       }
       html[data-ytc-theme] :is(ytd-masthead #container, ytd-guide-renderer #sections,
-        ytd-guide-renderer #footer, ytd-mini-guide-renderer #items) { background: transparent !important; }
+        ytd-mini-guide-renderer #items) { background: transparent !important; }
+      html[data-ytc-theme] ytd-guide-renderer ytd-guide-entry-renderer {
+        margin-block-end: 6px !important;
+      }
+      html[data-ytc-theme] ytd-guide-renderer #footer {
+        box-sizing: border-box !important;
+        width: calc(100% - 24px) !important;
+        margin: 12px !important;
+        padding: 14px 12px !important;
+        border: 1px solid ${rgba(text, 0.25)} !important;
+        border-radius: 18px !important;
+      }
+      html[data-ytc-theme] ytd-guide-renderer :is(#guide-links-primary, #guide-links-secondary) {
+        padding: 0 !important;
+        margin: 0 0 12px !important;
+      }
+      html[data-ytc-theme] ytd-guide-renderer #footer a {
+        color: ${muted} !important;
+        line-height: 1.6 !important;
+      }
+      html[data-ytc-theme] ytd-guide-renderer #footer a:is(:hover, :focus-visible) {
+        color: ${text} !important;
+        text-decoration: underline;
+      }
+      html[data-ytc-theme] ytd-guide-renderer #footer a:focus-visible {
+        outline: 2px solid ${accent};
+        outline-offset: 2px;
+        border-radius: 3px;
+      }
+      html[data-ytc-theme] ytd-guide-renderer #copyright {
+        padding: 0 !important;
+        color: ${muted} !important;
+        line-height: 1.6 !important;
+      }
+      html[data-ytc-theme] ytd-guide-renderer #copyright::before {
+        content: "";
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        margin-inline-end: 8px;
+        border-radius: 50%;
+        background: ${accent};
+      }
 
       html[data-ytc-theme] :is(ytd-watch-metadata #description,
         ytd-feed-nudge-renderer #content-wrapper, tp-yt-app-drawer #contentContainer) {

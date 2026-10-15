@@ -10,6 +10,7 @@
   // reinjection, and bypass them on disposal instead of closing their AudioContext.
   const resources = runtime.audioResources ||= { context: null, graphs: new WeakMap(), connected: new Set() };
   resources.failedVideos ||= new WeakSet();
+  resources.targets ||= new WeakMap();
 
   function isPlayerVideo(video) {
     return video instanceof HTMLVideoElement && video.matches(PLAYER_VIDEO_SELECTOR) &&
@@ -30,48 +31,94 @@
   }
 
   function ramp(parameter, value, context) {
-    if (parameter.value === value) return;
-    if (parameter.cancelAndHoldAtTime) parameter.cancelAndHoldAtTime(context.currentTime);
-    else parameter.cancelScheduledValues(context.currentTime);
-    parameter.setTargetAtTime(value, context.currentTime, 0.015);
+    // Compare targets, not an in-flight value: a second media event must not restart
+    // a fade, and a quick reversal must cancel it even before its first audio frame.
+    if (resources.targets.has(parameter) ? resources.targets.get(parameter) === value : parameter.value === value) {
+      resources.targets.set(parameter, value);
+      return;
+    }
+    const now = context.currentTime;
+    if (parameter.cancelAndHoldAtTime) parameter.cancelAndHoldAtTime(now);
+    else {
+      const held = parameter.value;
+      parameter.cancelScheduledValues(now);
+      parameter.setValueAtTime(held, now);
+    }
+    parameter.setTargetAtTime(value, now, 0.015);
+    resources.targets.set(parameter, value);
+  }
+
+  function prepareOutput(graph) {
+    const { context } = graph;
+    const processed = graph.route === 'processed';
+    graph.bypassGain = context.createGain();
+    graph.processedGain = context.createGain();
+    graph.limitedGain = context.createGain();
+    graph.unlimitedGain = context.createGain();
+    graph.output = context.createGain();
+    graph.bypassGain.gain.value = processed ? 0 : 1;
+    graph.processedGain.gain.value = processed ? 1 : 0;
+    graph.limitedGain.gain.value = graph.limited === false ? 0 : 1;
+    graph.unlimitedGain.gain.value = graph.limited === false ? 1 : 0;
+    graph.bypassGain.connect(graph.output);
+    graph.processedGain.connect(graph.output);
+    graph.limitedGain.connect(graph.processedGain);
+    graph.unlimitedGain.connect(graph.processedGain);
+    graph.output.connect(context.destination);
+    graph.gain.connect(graph.unlimitedGain);
+    graph.gain.connect(graph.limiter);
+    graph.limiter.connect(graph.limitedGain);
+  }
+
+  function connectSource(graph) {
+    graph.source.connect(graph.bass);
+    graph.source.connect(graph.bypassGain);
+  }
+
+  function ensureOutput(graph) {
+    if (!graph.output) {
+      // Upgrade a retained graph from an older injection without acquiring a
+      // second MediaElementAudioSourceNode for the same video.
+      graph.gain.disconnect();
+      graph.limiter.disconnect();
+      prepareOutput(graph);
+      graph.source.disconnect();
+      connectSource(graph);
+    } else if (graph.route === 'detached') {
+      connectSource(graph);
+      graph.output.connect(graph.context.destination);
+    }
   }
 
   function bypass(graph) {
+    ensureOutput(graph);
     if (graph.route === 'bypass') return;
-    graph.source.disconnect();
-    graph.gain.disconnect();
-    graph.limiter.disconnect();
-    graph.source.connect(graph.context.destination);
+    ramp(graph.bypassGain.gain, 1, graph.context);
+    ramp(graph.processedGain.gain, 0, graph.context);
     graph.route = 'bypass';
   }
 
   function process(graph, settings) {
+    ensureOutput(graph);
     const { context } = graph;
     ramp(graph.bass.gain, settings.bassGain, context);
     ramp(graph.mid.gain, settings.midGain, context);
     ramp(graph.treble.gain, settings.trebleGain, context);
     ramp(graph.balance.pan, settings.audioBalance / 100, context);
     ramp(graph.gain.gain, settings.volumeBoost / 100, context);
-    if (graph.route !== 'processed' || graph.limited !== settings.audioLimiter) {
-      graph.gain.disconnect();
-      graph.limiter.disconnect();
-      if (settings.audioLimiter) {
-        graph.gain.connect(graph.limiter);
-        graph.limiter.connect(context.destination);
-      } else graph.gain.connect(context.destination);
-      graph.limited = settings.audioLimiter;
-    }
-    if (graph.route !== 'processed') {
-      graph.source.disconnect();
-      graph.source.connect(graph.bass);
-      graph.route = 'processed';
-    }
+    ramp(graph.limitedGain.gain, settings.audioLimiter ? 1 : 0, context);
+    ramp(graph.unlimitedGain.gain, settings.audioLimiter ? 0 : 1, context);
+    ramp(graph.bypassGain.gain, 0, context);
+    ramp(graph.processedGain.gain, 1, context);
+    graph.limited = settings.audioLimiter;
+    graph.route = 'processed';
   }
 
-  function createGraph(video, context) {
+  function createGraph(video, context, settings) {
     const graph = { video, context, bass: context.createBiquadFilter(), mid: context.createBiquadFilter(),
       treble: context.createBiquadFilter(), balance: context.createStereoPanner(),
-      gain: context.createGain(), limiter: context.createDynamicsCompressor(), route: 'bypass' };
+      gain: context.createGain(), limiter: context.createDynamicsCompressor(),
+      route: 'bypass', limited: settings.audioLimiter };
     graph.bass.type = 'lowshelf';
     graph.bass.frequency.value = 180;
     graph.mid.type = 'peaking';
@@ -88,9 +135,12 @@
     graph.mid.connect(graph.treble);
     graph.treble.connect(graph.balance);
     graph.balance.connect(graph.gain);
+    // Keep both routes connected. Audio-thread fades avoid discontinuities from
+    // disconnect/reconnect when media events or settings change during playback.
+    prepareOutput(graph);
     // Build the processing nodes first. If creation fails, native audio stays untouched.
     graph.source = context.createMediaElementSource(video);
-    graph.source.connect(context.destination);
+    connectSource(graph);
     resources.graphs.set(video, graph);
     resources.connected.add(graph);
     return graph;
@@ -122,7 +172,9 @@
     function resume() {
       if (disposed) return null;
       try {
-        if (!resources.context) resources.context = new AudioContext({ latencyHint: 'interactive' });
+        // Video playback needs headroom for page interactions, rather than the
+        // smallest output buffer used by live instruments and interactive sound.
+        if (!resources.context) resources.context = new AudioContext({ latencyHint: 'playback' });
         attachListeners();
         const context = resources.context;
         if (context.state === 'closed') { problem = 'error'; return null; }
@@ -150,7 +202,7 @@
       if (context?.state !== 'running') return;
       try {
         if (!graph) pruneDetached();
-        graph ||= createGraph(video, context);
+        graph ||= createGraph(video, context, settings);
         process(graph, settings);
         resources.connected.add(graph);
         problem = '';
@@ -161,8 +213,11 @@
       for (const graph of resources.connected) {
         if (!graph.video.isConnected && graph.video.paused) {
           graph.source.disconnect();
-          graph.gain.disconnect();
-          graph.limiter.disconnect();
+          if (graph.output) graph.output.disconnect();
+          else {
+            graph.gain.disconnect();
+            graph.limiter.disconnect();
+          }
           graph.route = 'detached';
           resources.connected.delete(graph);
         }
@@ -216,7 +271,7 @@
       resources.connected.forEach(bypass);
       attachListeners();
       // Closing a context cannot undo createMediaElementSource and would mute the video.
-      // A direct source-to-destination connection keeps native sound on disable/reinjection.
+      // The unity-gain bypass keeps normal sound on disable/reinjection.
     }
 
     return Object.freeze({ sync, refresh, dispose, get status() {

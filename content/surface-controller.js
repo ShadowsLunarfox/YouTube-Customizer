@@ -218,6 +218,10 @@
     .map(match => match[1]));
 
   function mightBeGlassElement(element) {
+    // These tokens occur as ancestors in the volume-control selectors. The
+    // player/video layout itself is never a glass surface; native resize writes
+    // must not run the large contextual selectors on every animation frame.
+    if (element.matches(PLAYER_SCOPE_SELECTOR + ', .html5-video-container')) return false;
     if (GLASS_CANDIDATE_TAGS.has(element.localName) || GLASS_CANDIDATE_IDS.has(element.id) ||
         element.getAttribute("role") === "dialog" || element.hasAttribute(UNIVERSAL_GLASS_ATTR) ||
         element.hasAttribute(UNIVERSAL_GLASS_CLEAR_ATTR)) return true;

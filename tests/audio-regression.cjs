@@ -20,12 +20,20 @@ function tone() {
 const wav=tone();
 const fixture=`<!doctype html><html><head><style>body{margin:20px;background:#333;color:white;font:16px Arial}.html5-video-player{width:640px;max-width:100%}video{width:320px;height:180px;background:#111}button{padding:12px;margin:8px}.ytp-play-progress{width:40%;height:4px;background:red}[hidden]{display:none!important}</style></head><body>
   <div id="movie_player" class="html5-video-player"><video loop></video><div class="ytp-play-progress"></div></div>
-  <button id="start">Play</button><button id="pause">Pause</button><button id="prepare">Prepare</button>
+  <button id="start">Play</button><button id="pause">Pause</button><button id="prepare">Prepare</button><button id="interact">Player settings</button>
   <div id="inline-player" class="html5-video-player"><video muted loop></video></div><video id="ytc-background-video" muted loop hidden></video>
   <script>
     window.prepareMedia=async()=>{const blob=await(await fetch('/fixture-tone.wav')).blob();window.toneUrl=URL.createObjectURL(blob);document.querySelectorAll('video').forEach(video=>video.src=window.toneUrl)};
     document.querySelector('#start').addEventListener('click',()=>document.querySelector('#movie_player video').play());
     document.querySelector('#pause').addEventListener('click',()=>document.querySelector('#movie_player video').pause());
+    document.querySelector('#interact').addEventListener('click',()=>{
+      const player=document.querySelector('#movie_player');
+      player.classList.toggle('ytp-settings-shown');
+      let menu=player.querySelector('.ytp-popup');
+      if(menu)menu.remove();
+      else {menu=document.createElement('div');menu.className='ytp-popup';menu.textContent='Settings';player.append(menu);}
+      player.querySelector('.ytp-play-progress').style.transform='scaleX(.5)';
+    });
     window.prepareMedia();
   </script></body></html>`;
 (async()=>{
@@ -44,7 +52,7 @@ const fixture=`<!doctype html><html><head><style>body{margin:20px;background:#33
     }});return result;});
     const measure=()=>popup.evaluate(async()=>{const[tab]=await chrome.tabs.query({url:'https://www.youtube.com/watch?v=audio-fixture'});const[{result}]=await chrome.scripting.executeScript({target:{tabId:tab.id},func:async()=>{
       const graph=YTCustomizerContent.audioResources.graphs.get(document.querySelector('#movie_player video')),context=graph.context;
-      const output=graph.route==='bypass'?graph.source:graph.limited?graph.limiter:graph.gain;
+      const output=graph.output;
       const splitter=context.createChannelSplitter(2),left=context.createAnalyser(),right=context.createAnalyser(),silent=context.createGain();left.fftSize=right.fftSize=4096;left.smoothingTimeConstant=right.smoothingTimeConstant=0;silent.gain.value=0;
       output.connect(splitter);splitter.connect(left,0);splitter.connect(right,1);left.connect(silent);right.connect(silent);silent.connect(context.destination);
       await new Promise(resolve=>setTimeout(resolve,180));
@@ -68,6 +76,18 @@ const fixture=`<!doctype html><html><head><style>body{margin:20px;background:#33
     const boosted=await measure();assert.ok(boosted.left.rms/native.left.rms>2.9&&boosted.left.rms/native.left.rms<3.1,'300% triples real sample amplitude');
     await settlePreview();
     assert.equal((await state()).styleText,originalStyle,'audio sliders do not replace visual CSS or rescan surfaces');
+    await popup.evaluate(async()=>{const[tab]=await chrome.tabs.query({url:'https://www.youtube.com/watch?v=audio-fixture'});await chrome.scripting.executeScript({target:{tabId:tab.id},func:()=>{
+      const graph=YTCustomizerContent.audioResources.graphs.get(document.querySelector('#movie_player video'));
+      globalThis.__audioReconnections=0;
+      for(const node of [graph.source,graph.gain,graph.limiter])for(const method of ['connect','disconnect']){
+        const original=node[method];node[method]=function(...args){globalThis.__audioReconnections++;return original.apply(this,args);};
+      }
+    }});});
+    const beforeClicks=await page.locator('#movie_player video').evaluate(video=>video.currentTime);
+    for(let i=0;i<12;i++)await page.locator('#interact').click();
+    assert.ok((await measure()).left.rms/boosted.left.rms>.97,'real media output stays audible after repeated player menu clicks');
+    assert.equal(await page.locator('#movie_player video').evaluate((video,before)=>video.currentTime!==before,beforeClicks),true,'clicks leave playback progressing');
+    assert.equal((await state()).sourceCount,1,'player clicks reuse the existing audio source');
     await page.locator('#movie_player video').evaluate(video=>video.volume=.25);const quiet=await measure();assert.ok(quiet.left.rms/boosted.left.rms>.23&&quiet.left.rms/boosted.left.rms<.27,'native volume slider still controls output');
     await page.locator('#movie_player video').evaluate(video=>video.muted=true);assert.ok((await measure()).left.rms<.0001,'native mute remains silent');
     await page.locator('#movie_player video').evaluate(video=>{video.muted=false;video.volume=1;});
@@ -80,6 +100,7 @@ const fixture=`<!doctype html><html><head><style>body{margin:20px;background:#33
     await popup.evaluate(()=>chrome.storage.sync.set({bassGain:0,midGain:0,trebleGain:0}));await page.waitForTimeout(180);
     await page.evaluate(async()=>{await document.querySelector('#inline-player video').play();await document.querySelector('#ytc-background-video').play();});assert.equal((await state()).preview,false);assert.equal((await state()).wallpaper,false);
     await popup.evaluate(()=>chrome.storage.sync.set({audioEnabled:false}));await waitRoute('bypass');const bypassed=await measure();assert.ok(Math.abs(bypassed.left.rms/native.left.rms-1)<.03,'off restores normal audio instead of closing its source context');
+    assert.equal(await popup.evaluate(async()=>{const[tab]=await chrome.tabs.query({url:'https://www.youtube.com/watch?v=audio-fixture'});const[{result}]=await chrome.scripting.executeScript({target:{tabId:tab.id},func:()=>globalThis.__audioReconnections});return result;}),0,'page clicks, EQ, limiter changes, and bypass never disconnect or reconnect a live audio route');
     assert.equal((await state()).volume,1);assert.equal((await state()).muted,false);
     await popup.evaluate(()=>chrome.storage.sync.set({audioEnabled:true,volumeBoost:200,audioLimiter:false}));await waitRoute('processed');
     await page.locator('#movie_player video').evaluate(video=>{video.currentTime=.5;});await page.locator('#pause').click();assert.equal(await page.locator('#movie_player video').evaluate(video=>video.paused),true);await page.locator('#start').click();
@@ -100,6 +121,6 @@ const fixture=`<!doctype html><html><head><style>body{margin:20px;background:#33
     await page.locator('#movie_player video').evaluate(async old=>{old.pause();const video=document.createElement('video');video.loop=true;video.src='https://media.example.invalid/tone.wav';old.replaceWith(video);await video.play();});await popup.locator('#audioEnabled').check();await page.waitForFunction(()=>document.querySelector('#movie_player video').readyState>=3);
     await page.waitForTimeout(150);const unsafe=await state();assert.equal(unsafe.route,null);assert.equal(unsafe.sourceCount,2);assert.equal(unsafe.paused,false);assert.equal(unsafe.muted,false);
     assert.deepEqual(errors,[]);
-    console.log('PASS: actual media boost/EQ/panning, native volume/mute/pause/seek, default off, live UI/persistence/reset, unchanged visual CSS, preview/wallpaper exclusion, bypass/disposal/reinjection, replacement video, and cross-origin fallback.');
+    console.log('PASS: actual media boost/EQ/panning, repeated player menu clicks, stable audio connections through limiter/bypass changes, native volume/mute/pause/seek, default off, live UI/persistence/reset, unchanged visual CSS, preview/wallpaper exclusion, bypass/disposal/reinjection, replacement video, and cross-origin fallback.');
   } finally {clearTimeout(deadline);await context.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

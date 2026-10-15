@@ -5,8 +5,10 @@
     audioKeys, normalize, normalizeAssets, iconDataUri
   } = YTCustomizer;
   const runtime = globalThis.YTCustomizerContent;
+  const isMusic = location.hostname === "music.youtube.com";
   if (!runtime?.createSurfaceController || !runtime?.createShortsController ||
-      !runtime?.createHomeShortsGridController || !runtime?.createAudioController) return;
+      !runtime?.createHomeShortsGridController || !runtime?.createAudioController ||
+      isMusic && !runtime?.buildMusicCss) return;
 
   const INSTANCE_KEY = "__ytProgressCustomizer";
   const previous = globalThis[INSTANCE_KEY];
@@ -290,7 +292,7 @@
     const fit = settings.backgroundFit === "tile" ? "auto" : settings.backgroundFit;
     const repeat = settings.backgroundFit === "tile" ? "repeat" : "no-repeat";
     const theater = 'html[data-ytc-custom-background] :is(ytd-watch-flexy, ytd-watch-grid)[theater]:not([fullscreen])';
-    return `
+    const baseCss = `
       html[data-ytc-theme] {
         --ytc-ui-background: ${rgba(surface, "var(--ytc-ui-opacity)")} !important;
         --yt-spec-base-background: ${panel} !important;
@@ -365,7 +367,9 @@
         z-index: -1 !important;
         pointer-events: none !important;
       }
-
+    `;
+    if (isMusic) return baseCss;
+    return baseCss + `
       html[data-ytc-theme] :is(ytd-masthead, ytd-mini-guide-renderer, ytd-guide-renderer) {
         background: ${navigationPanel} !important;
         color: ${text} !important;
@@ -532,8 +536,19 @@
       ${theater} .player-container-background {
         display: none !important;
       }
-      /* The outer stage can sample the wallpaper across YouTube's player-resize transition layer. */
+      /* Keep the resizing video outside the backdrop surface. The stage's
+         background sibling can still sample wallpaper across the native player
+         view-transition layer, without filtering an ancestor of the video. */
       ${theater} :is(#full-bleed-container, #player-theater-container:not(#full-bleed-container *)) {
+        position: relative !important;
+        isolation: isolate !important;
+      }
+      ${theater} :is(#full-bleed-container, #player-theater-container:not(#full-bleed-container *))::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        pointer-events: none;
         backdrop-filter: var(--ytc-ui-backdrop) !important;
       }
 
@@ -804,9 +819,9 @@
     `;
   }
 
-  const surfaces = runtime.createSurfaceController();
-  const shorts = runtime.createShortsController(() => surfaces.scheduleUniversalGlass(true));
-  const homeShortsGrid = runtime.createHomeShortsGridController();
+  const surfaces = isMusic ? null : runtime.createSurfaceController();
+  const shorts = isMusic ? null : runtime.createShortsController(() => surfaces.scheduleUniversalGlass(true));
+  const homeShortsGrid = isMusic ? null : runtime.createHomeShortsGridController();
   const audio = runtime.createAudioController();
 
   function applyStyles(settings, assets = currentAssets) {
@@ -850,16 +865,19 @@
     syncBackgroundVideo();
     const css = buildPlayerCss(currentSettings, currentAssets.customIconData) +
       buildAppearanceCss(currentSettings, currentAssets) +
-      (runtime.buildHomepageGlassCss?.() || "") + (runtime.buildSurfaceCss?.() || "") + buildLayoutCss(currentSettings) +
-      buildEffectsCss(currentSettings) + buildGridCss(currentSettings) + runtime.buildHomeShortsGridCss(currentSettings);
+      (isMusic ? runtime.buildMusicCss(currentSettings) :
+        (runtime.buildHomepageGlassCss?.() || "") + (runtime.buildSurfaceCss?.() || "") + buildLayoutCss(currentSettings) +
+        buildEffectsCss(currentSettings) + buildGridCss(currentSettings) + runtime.buildHomeShortsGridCss(currentSettings));
     if (styleEl.textContent !== css) styleEl.textContent = css;
     document.documentElement.toggleAttribute("data-ytc-reduced-effects", currentSettings.reduceAnimations);
     document.documentElement.toggleAttribute("data-ytc-disable-video-previews", currentSettings.disableVideoPreviews);
-    stopActiveThumbnailPreviews();
-    syncSidebarSections();
-    shorts.sync();
-    homeShortsGrid.sync(currentSettings);
-    surfaces.apply();
+    if (!isMusic) {
+      stopActiveThumbnailPreviews();
+      syncSidebarSections();
+      shorts.sync();
+      homeShortsGrid.sync(currentSettings);
+      surfaces.apply();
+    }
     stylesApplied = true;
   }
 
@@ -961,6 +979,7 @@
     if (!styleEl?.isConnected) applyStyles(currentSettings);
     if (backgroundImageLayer && !backgroundImageLayer.isConnected) syncBackgroundImage();
     if (backgroundVideo && !backgroundVideo.isConnected) syncBackgroundVideo();
+    if (isMusic) return;
     if (records.some(record => {
       if (record.type !== "childList") return false;
       const target = record.target instanceof Element ? record.target : record.target.parentElement;
@@ -978,19 +997,22 @@
     surfaces.handleMutations(records);
   });
   observer.observe(document.documentElement, {
-    childList: true, subtree: true, attributes: true,
-    attributeFilter: ["style", "class", "hidden", "role", "has-paygated-featured-badge", "is-shorts"]
+    childList: true, subtree: true,
+    ...(!isMusic && { attributes: true,
+      attributeFilter: ["style", "class", "hidden", "role", "has-paygated-featured-badge", "is-shorts"] })
   });
 
   const shortsEvents = ["yt-navigate-finish", "yt-page-data-updated", "fullscreenchange", "visibilitychange", "play", "loadeddata"];
-  shortsEvents.forEach(event => document.addEventListener(event, shorts.sync, true));
-  document.addEventListener("yt-navigate-finish", surfaces.apply);
-  document.addEventListener("yt-navigate-finish", homeShortsGrid.refresh);
-  document.addEventListener("yt-page-data-updated", homeShortsGrid.refresh);
-  window.addEventListener("popstate", homeShortsGrid.refresh);
-  window.addEventListener("popstate", surfaces.apply);
-  window.addEventListener("popstate", shorts.sync);
-  window.addEventListener("resize", shorts.schedule);
+  if (!isMusic) {
+    shortsEvents.forEach(event => document.addEventListener(event, shorts.sync, true));
+    document.addEventListener("yt-navigate-finish", surfaces.apply);
+    document.addEventListener("yt-navigate-finish", homeShortsGrid.refresh);
+    document.addEventListener("yt-page-data-updated", homeShortsGrid.refresh);
+    window.addEventListener("popstate", homeShortsGrid.refresh);
+    window.addEventListener("popstate", surfaces.apply);
+    window.addEventListener("popstate", shorts.sync);
+    window.addEventListener("resize", shorts.schedule);
+  }
   document.addEventListener("visibilitychange", syncBackgroundVideo);
 
   globalThis[INSTANCE_KEY] = {
@@ -1000,18 +1022,20 @@
       disposed = true;
       observer.disconnect();
       clearTimeout(sidebarTimer);
-      shorts.dispose();
-      homeShortsGrid.dispose();
+      shorts?.dispose();
+      homeShortsGrid?.dispose();
       audio.dispose();
-      surfaces.dispose();
-      shortsEvents.forEach(event => document.removeEventListener(event, shorts.sync, true));
-      document.removeEventListener("yt-navigate-finish", surfaces.apply);
-      document.removeEventListener("yt-navigate-finish", homeShortsGrid.refresh);
-      document.removeEventListener("yt-page-data-updated", homeShortsGrid.refresh);
-      window.removeEventListener("popstate", homeShortsGrid.refresh);
-      window.removeEventListener("popstate", surfaces.apply);
-      window.removeEventListener("popstate", shorts.sync);
-      window.removeEventListener("resize", shorts.schedule);
+      surfaces?.dispose();
+      if (!isMusic) {
+        shortsEvents.forEach(event => document.removeEventListener(event, shorts.sync, true));
+        document.removeEventListener("yt-navigate-finish", surfaces.apply);
+        document.removeEventListener("yt-navigate-finish", homeShortsGrid.refresh);
+        document.removeEventListener("yt-page-data-updated", homeShortsGrid.refresh);
+        window.removeEventListener("popstate", homeShortsGrid.refresh);
+        window.removeEventListener("popstate", surfaces.apply);
+        window.removeEventListener("popstate", shorts.sync);
+        window.removeEventListener("resize", shorts.schedule);
+      }
       document.removeEventListener("visibilitychange", syncBackgroundVideo);
       removeBackgroundImage();
       removeBackgroundVideo();

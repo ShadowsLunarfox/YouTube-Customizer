@@ -29,6 +29,7 @@
 - Upload a background image, GIF, or MP4 video up to 20 MB, choose Fill or Fit, and adjust its opacity. Images can also be tiled. MP4 videos loop silently.
 - YouTube ambient lighting is suppressed while a custom background is active.
 - In theater mode (T), the empty space around the video reveals your wallpaper with the current UI blur setting.
+- YouTube Music shares the same themes and wallpapers, with individual frosted song, video, and album cards, plus themed navigation, menus, the player bar, and the queue. Section and channel titles have fitted rounded borders; video and album cards inset their artwork and captions within rounded edges. Play all/More controls, carousel arrows, genre tiles, and Explore shortcuts share the theme. The gaps between cards reveal the wallpaper. Its native carousels and song controls keep their layout; theme updates do not scan the page during playback.
 
 ### ▶️ Player
 
@@ -111,6 +112,7 @@ After changing or updating the project files, open the browser's extensions page
 | `yt.js`, `content/` | YouTube page styling and feature controllers |
 | `content/home-shorts-grid.js` | Homepage Shorts columns; updates on shelf structure changes and detaches outside Home |
 | `content/audio-controller.js` | Player volume boost and equalizer; native Web Audio nodes with normal-audio bypass |
+| `content/music-theme.js` | YouTube Music appearance and layout; CSS surfaces without playback-time scans |
 | `tests/` | Regression and browser smoke-test scripts |
 
 <div align="center">

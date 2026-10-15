@@ -170,7 +170,7 @@ async function connectToCurrentTab() {
   if (response?.version !== SCRIPT_VERSION) {
     await chrome.scripting.executeScript({
       target: { tabId: tab.id, allFrames: true },
-      files: ["settings.js", "content/surface-controller.js", "content/shorts-controller.js", "content/homepage-glass.js", "content/home-shorts-grid.js", "content/audio-controller.js", "yt.js"]
+      files: ["settings.js", "content/surface-controller.js", "content/shorts-controller.js", "content/homepage-glass.js", "content/home-shorts-grid.js", "content/audio-controller.js", "content/music-theme.js", "yt.js"]
     });
     response = await chrome.tabs.sendMessage(tab.id, { type: "YT_PROGRESS_PING" });
   }

@@ -28,8 +28,8 @@ function fixture(modern) {
     ytd-rich-shelf-renderer>#dismissible{position:relative;width:100%;margin-bottom:40px;padding-bottom:40px;border-bottom:1px solid #444}
     #rich-shelf-header{display:flex;justify-content:space-between;margin:0 0 16px 8px}
     #title-container{display:flex;flex-direction:column} h2{font-size:20px;margin:0 0 4px} #subtitle{font-size:12px} #subtitle-text{font-size:13px;margin-top:8px}
-    #contents-container{margin-top:-12px} #contents{display:flex;flex-wrap:wrap;margin:0 -6px -12px;padding:12px 0}
-    ytd-rich-item-renderer{display:block;width:calc(100% / var(--ytd-rich-grid-items-per-row,6) - 12px);margin:0 6px 24px}
+    #contents-container{margin-top:-12px} #contents{display:flex;flex-wrap:wrap;align-items:flex-start;margin:0 -6px -12px;padding:12px 0}
+    ytd-rich-item-renderer{display:block;align-self:start;height:fit-content;width:calc(100% / var(--ytd-rich-grid-items-per-row,6) - 12px);margin:0 6px 24px}
     ytd-rich-item-renderer>#content{display:block} yt-lockup-view-model{display:flex;flex:1;position:relative;min-width:0}
     .ytLockupViewModelVertical{flex-direction:column} .ytLockupViewModelContentImage{display:block;position:relative;width:100%}
     yt-lockup-view-model>.ytLockupViewModelHost{display:flex;flex-direction:column;flex:none;width:360px}
@@ -167,6 +167,29 @@ function check(state,width,count) {
       await page.locator('#title-container').evaluate(el=>el.insertAdjacentHTML('beforeend','<span id="paygated-featured-badge">YouTube featured</span>'));
       await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-card]')).backdropFilter==='none',null,{timeout:3000});
       await page.setViewportSize({width:1880,height:1000});check(await layout(page),1880,4);
+      // The featured badge can be stamped outside the legacy header slot.
+      await page.locator('#paygated-featured-badge').evaluate(el=>el.closest('#rich-shelf-header').after(el));
+      await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-card]')).backdropFilter==='none',null,{timeout:3000});
+      check(await layout(page),1880,4);
+      await page.locator('#paygated-featured-badge').evaluate(el=>el.hidden=true);
+      await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-card]')).backdropFilter==='blur(12px)',null,{timeout:3000});
+      // Some variants identify membership videos only on the video badge.
+      await page.locator('.members-badge').first().evaluate(el=>{
+        const host=document.createElement('ytd-badge-supported-renderer');
+        el.replaceWith(host);host.append(el);el.classList.add('badge-style-type-members-only');
+      });
+      await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-card]')).backdropFilter==='none',null,{timeout:3000});
+      check(await layout(page),1880,4);
+      await page.locator('.members-badge').first().evaluate(el=>el.classList.remove('badge-style-type-members-only'));
+      await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-card]')).backdropFilter==='blur(12px)',null,{timeout:3000});
+      await page.locator('.members-badge').first().evaluate(el=>el.classList.add('badge-style-type-members-only'));
+      await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-card]')).backdropFilter==='none',null,{timeout:3000});
+      await page.locator('ytd-badge-supported-renderer').evaluate(el=>el.remove());
+      await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-card]')).backdropFilter==='blur(12px)',null,{timeout:3000});
+      await page.locator('#paygated-featured-badge').evaluate(el=>{
+        el.hidden=false;document.querySelector('#title-container').append(el);
+      });
+      await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-card]')).backdropFilter==='none',null,{timeout:3000});
       await page.locator('#memberships').evaluate(el=>el.setAttribute('has-paygated-featured-badge',''));
       await page.locator('#ordinary').evaluate(el=>el.setAttribute('has-paygated-featured-badge',''));
       await page.waitForFunction(()=>document.querySelector('#ordinary').style.backdropFilter==='var(--ytc-ui-backdrop)');
@@ -178,6 +201,6 @@ function check(state,width,count) {
       assert.deepEqual(await page.locator('#memberships').evaluate(el=>({padding:getComputedStyle(el).padding,radius:getComputedStyle(el).borderRadius,style:el.getAttribute('style')||''})),original,'disabling restores the native shelf');
     }
     assert.deepEqual(errors,[]);
-    console.log('PASS: classic/nested modern memberships at 1880/1440/800/390px; fitted heading, inset cards, menu clicks, expansion, late/hidden/removed badges, column settings, wallpaper, opacity, recycled shelves, restoration, and no overflow.');
+    console.log('PASS: classic/nested modern memberships at 1880/1440/800/390px; equal heights despite native start alignment, relocated/late/hidden/removed featured badges, video badge fallback, inset borders, menu clicks, expansion, column settings, wallpaper, opacity, recycled shelves, restoration, and no overflow.');
   } finally {clearTimeout(deadline);await context.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

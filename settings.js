@@ -27,6 +27,18 @@
     backgroundFit: "cover",
     backgroundOpacity: 40,
     videosPerRow: 6,
+    customizeCards: false,
+    cardRadius: 16,
+    cardBorderWidth: 1,
+    cardPadding: 10,
+    cardGap: 16,
+    shelfSpacing: 16,
+    cardTitleLines: 2,
+    equalCardHeights: true,
+    hideHomePlayables: false,
+    hideHomeFeatured: false,
+    hideHomeTopicShelves: false,
+    hideHomeShopping: false,
     disableVideoPreviews: false,
     hideHomeTopicBar: false,
     hideCreateButton: false,
@@ -63,10 +75,14 @@
     appearance: ["themeEnabled", "pageColor", "surfaceColor", "uiOpacity", "uiBlur", "textColor", "accentColor", "backgroundMode", "backgroundFit", "backgroundOpacity"],
     player: ["progressColor", "progressEffect", "bufferColor", "heatmapColor", "thumbColor", "thumbStyle", "barHeight", "thumbSize"],
     audio: audioKeys,
-    layout: ["videosPerRow", "disableVideoPreviews", "hideHomeTopicBar", "hideCreateButton", "hideNotificationsButton", "hideSidebarSubscriptions", "hideSidebarYou", "hideSidebarExplore", "hideSidebarMoreFromYouTube", "hideSidebarReportHistory", "relatedThumbnailWidth", "hideShorts", "hideRelated", "hideComments", "hideChat", "reduceAnimations"]
+    layout: ["videosPerRow", "customizeCards", "cardRadius", "cardBorderWidth", "cardPadding", "cardGap", "shelfSpacing", "cardTitleLines", "equalCardHeights", "hideHomePlayables", "hideHomeFeatured", "hideHomeTopicShelves", "hideHomeShopping", "disableVideoPreviews", "hideHomeTopicBar", "hideCreateButton", "hideNotificationsButton", "hideSidebarSubscriptions", "hideSidebarYou", "hideSidebarExplore", "hideSidebarMoreFromYouTube", "hideSidebarReportHistory", "relatedThumbnailWidth", "hideShorts", "hideRelated", "hideComments", "hideChat", "reduceAnimations"]
   });
+  const pageScopes = Object.freeze(["home", "watch", "music"]);
+  const profileKeys = Object.freeze([...tabKeys.appearance, ...tabKeys.layout]);
+  const cardKeys = Object.freeze(["cardRadius", "cardBorderWidth", "cardPadding", "cardGap", "shelfSpacing", "cardTitleLines", "equalCardHeights"]);
   const ranges = { barHeight: [3, 14], thumbSize: [10, 34], backgroundOpacity: [0, 100], uiOpacity: [0, 100], uiBlur: [0, 30], videosPerRow: [2, 6], relatedThumbnailWidth: [72, 168],
-    volumeBoost: [100, 500], bassGain: [-12, 12], midGain: [-12, 12], trebleGain: [-12, 12], audioBalance: [-100, 100] };
+    volumeBoost: [100, 500], bassGain: [-12, 12], midGain: [-12, 12], trebleGain: [-12, 12], audioBalance: [-100, 100],
+    cardRadius: [0, 32], cardBorderWidth: [0, 4], cardPadding: [0, 24], cardGap: [4, 32], shelfSpacing: [0, 48], cardTitleLines: [1, 4] };
   const choices = {
     progressEffect: ["solid", "pulse", "shimmer", "rainbow"], thumbStyle: [...Object.keys(shapes), "custom"],
     backgroundMode: ["color", "image"], backgroundFit: ["cover", "contain", "tile"]
@@ -124,12 +140,133 @@
     };
   }
 
+  const record = value => value !== null && typeof value === "object" && !Array.isArray(value);
+  function normalizeProfiles(value = {}) {
+    const result = {};
+    if (!record(value)) return result;
+    for (const scope of pageScopes) {
+      if (!Object.hasOwn(value, scope) || !record(value[scope])) continue;
+      const profile = value[scope], source = record(profile.settings) ? profile.settings : {};
+      const normalized = normalize(source);
+      result[scope] = {
+        enabled: profile.enabled === true,
+        settings: Object.fromEntries(profileKeys.filter(key => Object.hasOwn(source, key)).map(key => [key, normalized[key]]))
+      };
+    }
+    return result;
+  }
+
+  function normalizePageAssets(value = {}) {
+    const result = {};
+    if (!record(value)) return result;
+    for (const scope of pageScopes) {
+      if (Object.hasOwn(value, scope) && record(value[scope]) && Object.hasOwn(value[scope], "backgroundImageData")) {
+        result[scope] = { backgroundImageData: normalizeAssets(value[scope]).backgroundImageData };
+      }
+    }
+    return result;
+  }
+
+  function pageScope(value) {
+    try {
+      const url = new URL(value);
+      if (!isYouTubeUrl(value)) return "shared";
+      if (url.hostname === "music.youtube.com") return "music";
+      if (url.pathname === "/") return "home";
+      if (/^\/(watch|shorts|live_chat|live_chat_replay|embed)(\/|$)/.test(url.pathname)) return "watch";
+    } catch {}
+    return "shared";
+  }
+
+  function resolveSettings(shared, profiles, scope) {
+    const base = normalize(shared), profile = normalizeProfiles(profiles)[scope];
+    return profile?.enabled ? { ...base, ...profile.settings } : base;
+  }
+
+  function resolveAssets(shared, pageAssets, profiles, scope) {
+    const base = normalizeAssets(shared);
+    return profiles?.[scope]?.enabled === true
+      ? { ...base, ...normalizePageAssets(pageAssets)[scope] } : base;
+  }
+
+  function validateSettings(source, keys = Object.keys(defaults)) {
+    if (!record(source)) throw new Error("Invalid settings in backup");
+    for (const key of keys) {
+      if (!Object.hasOwn(source, key)) continue;
+      const value = source[key];
+      const valid = typeof defaults[key] === "boolean" ? typeof value === "boolean" :
+        ranges[key] ? (typeof value === "number" && Number.isFinite(value)) :
+        choices[key] ? choices[key].includes(value) : typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value);
+      if (!valid) throw new Error("Invalid backup setting: " + key);
+    }
+  }
+
+  function createBackup(settings, profiles, assets, pageAssets, includeMedia = true) {
+    return {
+      format: "youtube-customizer", schemaVersion: 1,
+      settings: normalize(settings), pageProfiles: normalizeProfiles(profiles),
+      ...(includeMedia ? { assets: normalizeAssets(assets), pageAssets: normalizePageAssets(pageAssets) } : {})
+    };
+  }
+
+  function parseBackup(text) {
+    let value;
+    if (typeof text !== "string" || text.length > 150 * 1024 * 1024) throw new Error("Backup is too large (150 MB max)");
+    try { value = JSON.parse(text); } catch { throw new Error("Choose a valid JSON backup"); }
+    if (!record(value) || value.format !== "youtube-customizer" || value.schemaVersion !== 1) {
+      throw new Error("Unsupported YouTube Customizer backup");
+    }
+    validateSettings(value.settings);
+    if (!Object.keys(defaults).some(key => Object.hasOwn(value.settings, key))) throw new Error("Backup contains no settings");
+    if (value.pageProfiles !== undefined && !record(value.pageProfiles)) throw new Error("Invalid page settings in backup");
+    for (const scope of pageScopes) if (Object.hasOwn(value.pageProfiles || {}, scope)) {
+      const profile = value.pageProfiles[scope];
+      if (!record(profile) || typeof profile.enabled !== "boolean") throw new Error("Invalid page profile: " + scope);
+      validateSettings(profile.settings, profileKeys);
+    }
+    const validateAssets = (source, backgroundOnly = false) => {
+      if (!record(source)) throw new Error("Invalid media in backup");
+      for (const key of backgroundOnly ? ["backgroundImageData"] : Object.keys(assetDefaults)) {
+        if (!Object.hasOwn(source, key)) continue;
+        const data = source[key];
+        if (data !== "" && !(key === "customIconData" ? isImageData(data) : isBackgroundData(data))) {
+          throw new Error("Invalid backup media: " + key);
+        }
+      }
+    };
+    if (Object.hasOwn(value, "assets")) validateAssets(value.assets);
+    if (Object.hasOwn(value, "pageAssets")) {
+      if (!record(value.pageAssets)) throw new Error("Invalid page media in backup");
+      for (const scope of pageScopes) if (Object.hasOwn(value.pageAssets, scope)) validateAssets(value.pageAssets[scope], true);
+    }
+    return {
+      settings: normalize(value.settings), pageProfiles: normalizeProfiles(value.pageProfiles),
+      ...(Object.hasOwn(value, "assets") ? { assets: normalizeAssets(value.assets) } : {}),
+      ...(Object.hasOwn(value, "pageAssets") ? { pageAssets: normalizePageAssets(value.pageAssets) } : {})
+    };
+  }
+
   function isYouTubeUrl(value) {
     if (typeof value !== "string") return false;
     try {
       const url = new URL(value);
       return url.protocol === "https:" && !url.username && !url.password &&
         (url.hostname === "youtube.com" || url.hostname.endsWith(".youtube.com"));
+    } catch { return false; }
+  }
+
+  function isSettingsPageUrl(value, popupUrl) {
+    if (value === popupUrl) return true;
+    try {
+      const url = new URL(value), endpoint = new URL(value), parameters = url.searchParams;
+      endpoint.search = "";
+      if (endpoint.href !== popupUrl || parameters.get("window") !== "1") return false;
+      const allowed = ["window", "target", "scope", "panel"];
+      if ([...parameters.keys()].some(key => !allowed.includes(key) || parameters.getAll(key).length !== 1)) return false;
+      const target = parameters.get("target"), scope = parameters.get("scope"), panel = parameters.get("panel");
+      return (target === null || /^\d+$/.test(target) && Number.isSafeInteger(Number(target))) &&
+        (scope === null || scope === "shared" || pageScopes.includes(scope)) &&
+        (panel === null || panel === "backup" || Object.hasOwn(tabKeys, panel));
     } catch { return false; }
   }
 
@@ -142,7 +279,8 @@
   }
 
   globalThis.YTCustomizer = Object.freeze({
-    version: "104", defaults, assetDefaults, presets, tabKeys, audioKeys, normalize, normalizeAssets,
-    isImageData, isBackgroundData, isYouTubeUrl, iconDataUri
+    version: "110", defaults, assetDefaults, presets, tabKeys, audioKeys, normalize, normalizeAssets,
+    pageScopes, profileKeys, cardKeys, normalizeProfiles, normalizePageAssets, pageScope, resolveSettings, resolveAssets, createBackup, parseBackup,
+    isImageData, isBackgroundData, isYouTubeUrl, isSettingsPageUrl, iconDataUri
   });
 })();

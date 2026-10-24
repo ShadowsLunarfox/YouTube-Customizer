@@ -12,13 +12,20 @@
       <header class="title-bar">
         <img class="app-icon" src="icons/icon-32.png" alt="" aria-hidden="true">
         <h1>YouTube Customizer</h1>
+        <button type="button" id="openWindow" title="Open the entire menu in a separate window" disabled>Open window</button>
       </header>
       <form id="settings-form" inert>
+        <div class="scope-controls">
+          <label class="field"><span>Editing settings for</span><select id="editingScope"><option value="shared">All pages (shared)</option><option value="home">YouTube Home</option><option value="watch">Watch pages / Shorts</option><option value="music">YouTube Music</option></select></label>
+          <label class="check-field" id="pageProfileRow" hidden><input type="checkbox" id="pageProfileEnabled"><span>Use separate appearance and layout</span></label>
+          <p class="field-hint" id="scopeHint">Pages without separate settings use the shared configuration.</p>
+        </div>
         <div class="tabs" role="tablist" aria-label="Settings">
           <button type="button" role="tab" id="tab-appearance" aria-controls="appearance-panel" aria-selected="true">Appearance</button>
           <button type="button" role="tab" id="tab-player" aria-controls="player-panel" aria-selected="false" tabindex="-1">Player</button>
           <button type="button" role="tab" id="tab-audio" aria-controls="audio-panel" aria-selected="false" tabindex="-1">Audio</button>
           <button type="button" role="tab" id="tab-layout" aria-controls="layout-panel" aria-selected="false" tabindex="-1">Layout</button>
+          <button type="button" role="tab" id="tab-backup" aria-controls="backup-panel" aria-selected="false" tabindex="-1">Backup</button>
         </div>
         <div class="tab-content">
           <section id="appearance-panel" role="tabpanel" aria-labelledby="tab-appearance" tabindex="0">
@@ -93,6 +100,24 @@
 </div></fieldset>
           </section>
           <section id="layout-panel" role="tabpanel" aria-labelledby="tab-layout" tabindex="0" hidden>
+            <fieldset><legend>Card layout</legend><div class="field-list">
+<label class="check-field"><input type="checkbox" id="customizeCards"><span>Customize card layout</span></label>
+<label class="field range-field"><span>Corner radius</span><input id="cardRadius" type="range" min="0" max="32" value="16"><span class="measurement"><output id="cardRadiusValue" for="cardRadius"></output><span>px</span></span></label>
+<label class="field range-field"><span>Border width</span><input id="cardBorderWidth" type="range" min="0" max="4" value="1"><span class="measurement"><output id="cardBorderWidthValue" for="cardBorderWidth"></output><span>px</span></span></label>
+<label class="field range-field"><span>Inner padding</span><input id="cardPadding" type="range" min="0" max="24" value="10"><span class="measurement"><output id="cardPaddingValue" for="cardPadding"></output><span>px</span></span></label>
+<label class="field range-field"><span>Card spacing</span><input id="cardGap" type="range" min="4" max="32" value="16"><span class="measurement"><output id="cardGapValue" for="cardGap"></output><span>px</span></span></label>
+<label class="field range-field"><span>Section spacing</span><input id="shelfSpacing" type="range" min="0" max="48" value="16"><span class="measurement"><output id="shelfSpacingValue" for="shelfSpacing"></output><span>px</span></span></label>
+<label class="field"><span>Title lines</span><select id="cardTitleLines"><option value="1">1 line</option><option value="2">2 lines</option><option value="3">3 lines</option><option value="4">4 lines</option></select></label>
+<label class="check-field"><input type="checkbox" id="equalCardHeights"><span>Keep cards in each row the same height</span></label>
+<p class="field-hint">Applies to video and music cards. Compact music lists keep their native row height.</p>
+</div></fieldset>
+            <fieldset><legend>Home sections</legend><div class="field-list">
+<label class="check-field"><input type="checkbox" id="hideHomePlayables"><span>Hide Playables</span></label>
+<label class="check-field"><input type="checkbox" id="hideHomeFeatured"><span>Hide featured / membership / Premium promos</span></label>
+<label class="check-field"><input type="checkbox" id="hideHomeTopicShelves"><span>Hide topic recommendation shelves</span></label>
+<label class="check-field"><input type="checkbox" id="hideHomeShopping"><span>Hide shopping recommendations</span></label>
+<p class="field-hint">Hidden sections also release their space in the Home feed.</p>
+</div></fieldset>
             <fieldset><legend>Video browsing</legend><div class="field-list">
 <label class="field"><span>Maximum videos per row</span><select id="videosPerRow"><option value="2">2 videos</option><option value="3">3 videos</option><option value="4">4 videos</option><option value="5">5 videos</option><option value="6">6 videos</option></select></label>
 <label class="check-field"><input type="checkbox" id="disableVideoPreviews" aria-describedby="disableVideoPreviewsHint"><span>Disable video previews</span></label>
@@ -119,6 +144,19 @@
 </div></fieldset>
             <fieldset><legend>Performance</legend><div class="field-list">
 <label class="check-field"><input type="checkbox" id="reduceAnimations"><span>Reduce motion</span></label>
+</div></fieldset>
+          </section>
+          <section id="backup-panel" role="tabpanel" aria-labelledby="tab-backup" tabindex="0" hidden>
+            <fieldset><legend>Export configuration</legend><div class="field-list">
+<p class="field-hint">Save shared settings and all page configurations to a JSON file.</p>
+<label class="check-field"><input type="checkbox" id="includeBackupMedia" checked><span>Include wallpapers and custom icon</span></label>
+<button type="button" id="exportSettings">Export backup...</button>
+</div></fieldset>
+            <fieldset><legend>Import configuration</legend><div class="field-list">
+<p class="field-hint">Import replaces shared and page settings. A settings-only backup keeps your current media files.</p>
+<button type="button" id="importSettings">Import backup...</button>
+<input type="file" id="backupFile" accept="application/json,.json" aria-label="Import YouTube Customizer backup" hidden>
+<p class="field-hint">YouTube Customizer JSON backups, up to 150 MB.</p>
 </div></fieldset>
           </section>
         </div>

@@ -46,12 +46,22 @@
 ### 🧩 Layout and browsing
 
 - Set Home videos and Shorts to 2–6 items per row, with fewer columns on narrow windows. Disable hover previews or reduce motion.
+- Enable **Customize card layout** to adjust corner radius, border width, padding, gaps, section spacing, title lines, and equal row heights. Compact Music lists retain their native row height.
+- Home Premium image promotions share the rounded glass frame, inset artwork and text, and section spacing. Their content wraps on narrow windows.
+- Independently hide Home Playables, featured/membership videos and Premium promotions, topic recommendation shelves, and shopping recommendations. Hidden sections release their feed space.
 - Home Shorts initially show one row. Show more reveals the additional cards; changing the column setting collapses the shelf again.
 - Library pages use rounded panels and cards with the shared theme background, opacity, and blur: History, Playlists, Watch later, Liked videos, Downloads, Courses, and Clips.
 - Channel memberships has a themed header, wrapping topic filters, rounded video and creator cards, and clearly separated section headings. Creator names and prices appear below their artwork.
 - Hide Shorts, the topic filter bar, the Create button, or the notifications button.
 - Independently hide Subscriptions, You, Explore, More from YouTube, and Report history in the sidebar.
 - Adjust related-video thumbnail width, or hide related videos, comments, or live chat.
+
+### Page settings and backups
+
+- Use **Editing settings for** to edit shared settings or separate appearance and layout for **YouTube Home**, **Watch pages / Shorts**, and **YouTube Music**. Editing a page creates its override; turn off **Use separate appearance and layout** to return to shared settings. Player and Audio settings are shared.
+- Each page can have its own wallpaper. Page configurations and uploaded media are stored locally; shared settings continue to use browser sync storage.
+- Click **Open window** in the menu title bar to move the entire settings menu into a separate, resizable browser window. It keeps your selected settings tab and page configuration, previews on the originating YouTube tab, and remains open while you browse. Clicking Open window again reuses the existing window.
+- The **Backup** tab exports shared settings and all page configurations as JSON, with an option to include wallpapers and the custom icon. Import validates the file and replaces settings; a backup without media preserves existing media files. Backups support up to 150 MB.
 
 ## 🚀 Installation
 

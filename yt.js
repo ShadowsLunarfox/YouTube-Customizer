@@ -2,7 +2,7 @@
 (() => {
   const {
     version: SCRIPT_VERSION, defaults: DEFAULT_SETTINGS, assetDefaults,
-    audioKeys, normalize, normalizeAssets, iconDataUri
+    audioKeys, normalize, normalizeAssets, normalizeProfiles, normalizePageAssets, pageScope, resolveSettings, isSettingsPageUrl, iconDataUri
   } = YTCustomizer;
   const runtime = globalThis.YTCustomizerContent;
   const isMusic = location.hostname === "music.youtube.com";
@@ -17,6 +17,11 @@
 
   let currentSettings = { ...DEFAULT_SETTINGS };
   let currentAssets = { ...assetDefaults };
+  let sharedSettings = { ...DEFAULT_SETTINGS };
+  let sharedAssets = { ...assetDefaults };
+  let pageProfiles = {};
+  let pageAssets = {};
+  let appliedScope = "";
   // Page-owned elements can reuse our ID; keep an owned node instead of adopting theirs.
   let styleEl = null;
   let stateRevision = 0;
@@ -32,6 +37,7 @@
 
   // Current recommendation cards mount their hover player in a portal outside the thumbnail.
   // Use the same scopes for hiding preview UI and stopping its media, including animated images.
+  
   const PREVIEW_SURFACE_SELECTOR = [
     "ytd-video-preview", ".ytdVideoPreviewHost",
     "ytd-video-preview-loader", ".ytdVideoPreviewLoaderHost",
@@ -645,6 +651,17 @@
 
   function buildLayoutCss(settings) {
     const hidden = [];
+    const home = 'ytd-browse[page-subtype="home"]';
+    const hideHomeSection = type => hidden.push(home + ' ' + type,
+      home + ' ytd-rich-section-renderer:has(' + type + ')');
+    if (settings.hideHomePlayables) hideHomeSection(runtime.playablesShelfTypeSelector);
+    if (settings.hideHomeFeatured) {
+      hideHomeSection('ytd-rich-shelf-renderer:not([is-shorts]):is([has-paygated-featured-badge], :has(#paygated-featured-badge:not([hidden]), .badge-style-type-members-only))');
+      hideHomeSection('ytd-brand-video-shelf-renderer:not([has-sku-view-model], [has-movie-renderer])');
+      hideHomeSection(runtime.homePromoTypeSelector);
+    }
+    if (settings.hideHomeTopicShelves) hideHomeSection(':is(ytd-chips-shelf-with-video-shelf-renderer, .ytdChipsShelfWithVideoShelfRendererHost)');
+    if (settings.hideHomeShopping) hideHomeSection(':is(ytd-brand-video-shelf-renderer[has-sku-view-model], ytd-product-shelf-renderer, ytd-shopping-shelf-renderer)');
     if (settings.hideShorts) hidden.push(
       "ytd-reel-shelf-renderer", "ytd-rich-shelf-renderer[is-shorts]",
       "ytd-rich-section-renderer:has(ytd-rich-shelf-renderer[is-shorts])",
@@ -729,6 +746,90 @@
       }
     `);
     return rules.join("\n");
+  }
+
+  function buildCardLayoutCss(settings) {
+    if (!settings.customizeCards) return "";
+    const scope = ':is(html[data-ytc-cards][data-ytc-theme], html[data-ytc-cards]) body';
+    const cards = isMusic ? 'ytmusic-two-row-item-renderer, ytmusic-responsive-list-item-renderer' :
+      'ytd-rich-item-renderer, .ytdRichItemRendererHost, ytd-video-renderer, ytd-compact-video-renderer, ytd-grid-video-renderer, ' +
+      ':is(yt-lockup-view-model, ytd-rich-grid-media, ytd-mini-game-card-view-model)' +
+        ':not(:is(ytd-rich-item-renderer, .ytdRichItemRendererHost, ytd-video-renderer, ytd-compact-video-renderer) *)';
+    const titles = '#video-title, h3, .ytLockupMetadataViewModelTitle, .yt-lockup-metadata-view-model__title, ' +
+      '.yt-lockup-metadata-view-model-wiz__title, .title';
+    return `
+      html[data-ytc-cards] {
+        --ytc-card-radius: ${settings.cardRadius}px;
+        --ytc-thumbnail-radius: ${Math.max(0, settings.cardRadius - 4)}px;
+        --ytc-card-border-width: ${settings.cardBorderWidth}px;
+        --ytc-card-padding: ${settings.cardPadding}px;
+        --ytc-card-gap: ${settings.cardGap}px;
+        --ytc-shelf-spacing: ${settings.shelfSpacing}px;
+        --ytc-card-alignment: ${settings.equalCardHeights ? 'stretch' : 'start'};
+      }
+      ${scope} :is(${cards}) {
+        box-sizing: border-box !important;
+        min-width: 0 !important;
+        padding: var(--ytc-card-padding) !important;
+        border: var(--ytc-card-border-width) solid color-mix(in srgb, var(--yt-spec-text-primary, currentColor) 22%, transparent) !important;
+        border-radius: var(--ytc-card-radius) !important;
+        align-self: var(--ytc-card-alignment) !important;
+        height: auto !important;
+      }
+      ${scope} :is(${cards}) :is(ytd-thumbnail, yt-thumbnail-view-model, .ytLockupViewModelContentImage,
+        .yt-lockup-view-model__content-image, .yt-lockup-view-model-wiz__content-image, .image-wrapper) {
+        border-radius: var(--ytc-thumbnail-radius) !important;
+        overflow: hidden !important;
+      }
+      ${scope} :is(${cards}) :is(${titles}) {
+        display: -webkit-box !important;
+        -webkit-box-orient: vertical !important;
+        -webkit-line-clamp: ${settings.cardTitleLines} !important;
+        line-clamp: ${settings.cardTitleLines};
+        max-height: none !important;
+        overflow: hidden !important;
+      }
+      ${settings.equalCardHeights ? `${scope} ${isMusic ? 'ytmusic-two-row-item-renderer' : `:is(${cards})`} :is(${titles}) {
+        min-height: ${settings.cardTitleLines}lh !important;
+      }` : ''}
+      ${isMusic ? `
+        ${scope} ytmusic-responsive-list-item-renderer {
+          padding: min(6px, var(--ytc-card-padding)) min(8px, var(--ytc-card-padding)) !important;
+        }
+        ${scope} ytmusic-responsive-list-item-renderer[height-style="MUSIC_RESPONSIVE_LIST_ITEM_HEIGHT_MEDIUM_COMPACT"] {
+          height: var(--ytmusic-list-item-height, 48px) !important;
+          --ytmusic-responsive-list-item-thumbnail-size: calc(var(--ytmusic-list-item-height, 48px)
+            - 2 * min(6px, var(--ytc-card-padding)) - 2 * var(--ytc-card-border-width)) !important;
+        }
+        ${scope} ytmusic-carousel-shelf-renderer #items {
+          gap: var(--ytc-card-gap) !important;
+        }
+        ${scope} ytmusic-carousel-shelf-renderer #items > ytmusic-two-row-item-renderer {
+          margin-inline-end: 0 !important;
+        }
+      ` : `
+        ${scope} ytd-browse[page-subtype="home"] ytd-rich-grid-renderer > #contents {
+          display: grid !important;
+          grid-template-columns: repeat(var(--ytc-grid-columns, 4), minmax(0, 1fr)) !important;
+          gap: var(--ytc-card-gap) !important;
+          align-items: var(--ytc-card-alignment) !important;
+        }
+        ${scope} ytd-browse[page-subtype="home"] ytd-rich-grid-row,
+        ${scope} ytd-browse[page-subtype="home"] ytd-rich-grid-row > #contents {
+          display: contents !important;
+        }
+        ${scope} ytd-browse[page-subtype="home"] ytd-rich-item-renderer {
+          margin: 0 !important;
+          width: auto !important;
+        }
+        ${scope} ytd-rich-grid-renderer > #contents > :is(ytd-rich-section-renderer, ytd-continuation-item-renderer) {
+          grid-column: 1 / -1 !important;
+        }
+        ${settings.equalCardHeights ? `${scope} ytd-rich-item-renderer > #content {
+          display: flex !important; flex-direction: column !important; height: 100% !important;
+        }` : ''}
+      `}
+    `;
   }
 
   function buildGridCss(settings) {
@@ -866,6 +967,22 @@
   const homeShortsGrid = isMusic ? null : runtime.createHomeShortsGridController();
   const audio = runtime.createAudioController();
 
+  function applyConfiguration(settings = sharedSettings, assets = sharedAssets, profiles = pageProfiles, media = pageAssets) {
+    sharedSettings = normalize(settings);
+    if (assets !== sharedAssets) sharedAssets = normalizeAssets(assets);
+    pageProfiles = normalizeProfiles(profiles);
+    if (media !== pageAssets) pageAssets = normalizePageAssets(media);
+    appliedScope = pageScope(location.href);
+    document.documentElement.setAttribute("data-ytc-page-scope", appliedScope);
+    const effectiveAssets = pageProfiles[appliedScope]?.enabled
+      ? { ...sharedAssets, ...pageAssets[appliedScope] } : sharedAssets;
+    applyStyles(resolveSettings(sharedSettings, pageProfiles, appliedScope), effectiveAssets);
+  }
+
+  function syncPageProfile() {
+    if (!disposed && pageScope(location.href) !== appliedScope) applyConfiguration();
+  }
+
   function applyStyles(settings, assets = currentAssets) {
     if (disposed) return;
     const nextSettings = normalize(settings);
@@ -893,6 +1010,7 @@
     document.documentElement.toggleAttribute("data-ytc-blur", currentSettings.themeEnabled && currentSettings.uiBlur > 0);
     if (surfaceTokensOnly) return;
     document.documentElement.toggleAttribute("data-ytc-theme", currentSettings.themeEnabled);
+    document.documentElement.toggleAttribute("data-ytc-cards", currentSettings.customizeCards);
     document.documentElement.toggleAttribute("data-ytc-chat-frame",
       window !== window.top && /^\/live_chat(?:_replay)?(?:\/|$)/.test(location.pathname));
     const hasCustomBackground = currentSettings.themeEnabled &&
@@ -909,7 +1027,7 @@
       buildAppearanceCss(currentSettings, currentAssets) +
       (isMusic ? runtime.buildMusicCss(currentSettings) :
         (runtime.buildHomepageGlassCss?.() || "") + (runtime.buildSurfaceCss?.() || "") + buildLayoutCss(currentSettings) +
-        buildEffectsCss(currentSettings) + buildGridCss(currentSettings) + runtime.buildHomeShortsGridCss(currentSettings));
+        buildEffectsCss(currentSettings) + buildGridCss(currentSettings) + runtime.buildHomeShortsGridCss(currentSettings)) + buildCardLayoutCss(currentSettings);
     if (styleEl.textContent !== css) styleEl.textContent = css;
     document.documentElement.toggleAttribute("data-ytc-reduced-effects", currentSettings.reduceAnimations);
     document.documentElement.toggleAttribute("data-ytc-disable-video-previews", currentSettings.disableVideoPreviews);
@@ -926,11 +1044,11 @@
   async function loadSettings() {
     const revision = stateRevision;
     const [assets, settings] = await Promise.all([
-      chrome.storage.local.get(assetDefaults), chrome.storage.sync.get(DEFAULT_SETTINGS)
+      chrome.storage.local.get({ ...assetDefaults, pageProfiles: {}, pageAssets: {} }), chrome.storage.sync.get(DEFAULT_SETTINGS)
     ]);
     if (disposed) return;
     if (revision !== stateRevision) return loadSettings();
-    applyStyles(settings, assets);
+    applyConfiguration(settings, assets, assets.pageProfiles, assets.pageAssets);
   }
 
   const ready = loadSettings().catch(() => applyStyles(currentSettings));
@@ -974,38 +1092,47 @@
   }
 
   function onStorageChanged(changes, area) {
-    if (area === "local" && Object.keys(assetDefaults).some(key => key in changes)) {
+    if (area === "local" && [...Object.keys(assetDefaults), "pageProfiles", "pageAssets"].some(key => key in changes)) {
       stateRevision++;
-      const assets = { ...currentAssets };
-      for (const key of Object.keys(assetDefaults)) if (key in changes) assets[key] = changes[key].newValue ?? "";
-      applyStyles(currentSettings, assets);
+      let assets = sharedAssets;
+      if (Object.keys(assetDefaults).some(key => key in changes)) {
+        assets = { ...sharedAssets };
+        for (const key of Object.keys(assetDefaults)) if (key in changes) assets[key] = changes[key].newValue ?? "";
+      }
+      applyConfiguration(sharedSettings, assets, changes.pageProfiles?.newValue ?? ("pageProfiles" in changes ? {} : pageProfiles),
+        changes.pageAssets?.newValue ?? ("pageAssets" in changes ? {} : pageAssets));
     } else if (area === "sync" && Object.keys(DEFAULT_SETTINGS).some(key => key in changes)) {
       stateRevision++;
-      const settings = { ...currentSettings };
+      const settings = { ...sharedSettings };
       for (const key of Object.keys(DEFAULT_SETTINGS)) if (key in changes) settings[key] = changes[key].newValue;
-      applyStyles(settings);
+      applyConfiguration(settings);
     }
   }
 
   function onMessage(message, sender, sendResponse) {
-    if (disposed || sender?.id !== chrome.runtime.id || sender?.url !== chrome.runtime.getURL("popup.html")) return false;
+    if (disposed || sender?.id !== chrome.runtime.id || !isSettingsPageUrl(sender?.url, chrome.runtime.getURL("popup.html"))) return false;
     if (message?.type !== "YT_PROGRESS_PING" && message?.type !== "YT_PROGRESS_LIVE_PREVIEW") return;
     if (message.type === "YT_PROGRESS_LIVE_PREVIEW" &&
         (!message.settings || typeof message.settings !== "object" || Array.isArray(message.settings) ||
-          message.assets !== undefined && (!message.assets || typeof message.assets !== "object" || Array.isArray(message.assets)))) return false;
+          message.assets !== undefined && (!message.assets || typeof message.assets !== "object" || Array.isArray(message.assets)) ||
+          message.profiles !== undefined && (!message.profiles || typeof message.profiles !== "object" || Array.isArray(message.profiles)))) return false;
     ready.then(() => {
       if (disposed) { sendResponse({ version: SCRIPT_VERSION, applied: false }); return; }
       if (message.type === "YT_PROGRESS_LIVE_PREVIEW") {
         stateRevision++;
-        const assets = { ...currentAssets };
-        for (const key of Object.keys(assetDefaults)) {
-          if (message.assets && Object.hasOwn(message.assets, key)) assets[key] = message.assets[key];
+        let assets = sharedAssets;
+        if (Object.keys(assetDefaults).some(key => message.assets && Object.hasOwn(message.assets, key) && message.assets[key] !== sharedAssets[key])) {
+          assets = { ...sharedAssets };
+          for (const key of Object.keys(assetDefaults)) {
+            if (message.assets && Object.hasOwn(message.assets, key)) assets[key] = message.assets[key];
+          }
         }
-        applyStyles(message.settings, assets);
+        applyConfiguration(message.settings, assets, message.profiles ?? pageProfiles);
       }
       sendResponse({
         version: SCRIPT_VERSION,
         applied: Boolean(styleEl?.isConnected),
+        scope: appliedScope,
         hasCustomIcon: Boolean(currentAssets.customIconData),
         hasBackgroundImage: Boolean(currentAssets.backgroundImageData),
         audioStatus: audio.status
@@ -1041,10 +1168,13 @@
   observer.observe(document.documentElement, {
     childList: true, subtree: true,
     ...(!isMusic && { attributes: true,
-      attributeFilter: ["style", "class", "hidden", "role", "has-paygated-featured-badge", "is-shorts"] })
+      attributeFilter: ["style", "class", "hidden", "role", "has-paygated-featured-badge", "is-shorts",
+        "is-playables", "is-mini-game-card-shelf", "is-game-card-shelf"] })
   });
 
   const shortsEvents = ["yt-navigate-finish", "yt-page-data-updated", "fullscreenchange", "visibilitychange", "play", "loadeddata"];
+  document.addEventListener("yt-navigate-finish", syncPageProfile);
+  window.addEventListener("popstate", syncPageProfile);
   if (!isMusic) {
     shortsEvents.forEach(event => document.addEventListener(event, shorts.sync, true));
     document.addEventListener("yt-navigate-finish", surfaces.apply);
@@ -1079,6 +1209,8 @@
         window.removeEventListener("resize", shorts.schedule);
       }
       document.removeEventListener("visibilitychange", syncBackgroundVideo);
+      document.removeEventListener("yt-navigate-finish", syncPageProfile);
+      window.removeEventListener("popstate", syncPageProfile);
       removeBackgroundImage();
       removeBackgroundVideo();
       chrome.storage.onChanged.removeListener(onStorageChanged);
@@ -1091,6 +1223,8 @@
       document.documentElement.removeAttribute("data-ytc-reduced-effects");
       document.documentElement.removeAttribute("data-ytc-disable-video-previews");
       document.documentElement.removeAttribute("data-ytc-chat-frame");
+      document.documentElement.removeAttribute("data-ytc-page-scope");
+      document.documentElement.removeAttribute("data-ytc-cards");
       document.documentElement.style.removeProperty("--ytc-ui-opacity");
       document.documentElement.style.removeProperty("--ytc-ui-blur");
       document.documentElement.style.removeProperty("--ytc-ui-backdrop");

@@ -56,10 +56,29 @@
     ytd-item-section-renderer, ytd-comments, #header, #content, #contents, #footer)`;
   const TOPICS_SHELF_SELECTOR = 'ytd-browse[page-subtype="home"] ' +
     ':is(ytd-chips-shelf-with-video-shelf-renderer, .ytdChipsShelfWithVideoShelfRendererHost)';
+  // The featured label can live outside the legacy header, or be omitted while
+  // the videos keep their native Members only badges. Do not depend on its text.
+  const MEMBERSHIPS_BADGE_SELECTOR = '#paygated-featured-badge, .badge-style-type-members-only';
   const MEMBERSHIPS_SHELF_SELECTOR = 'ytd-browse[page-subtype="home"] ' +
     'ytd-rich-shelf-renderer:not([is-shorts]):is([has-paygated-featured-badge], ' +
-    ':has(#rich-shelf-header #paygated-featured-badge:not([hidden])))';
+    ':has(:is(' + MEMBERSHIPS_BADGE_SELECTOR + '):not([hidden])))';
   runtime.membershipsShelfSelector = MEMBERSHIPS_SHELF_SELECTOR;
+  const BRAND_VIDEO_SHELF_SELECTOR = 'ytd-browse[page-subtype="home"] ytd-brand-video-shelf-renderer';
+  const BRAND_VIDEO_CARD_SELECTOR = BRAND_VIDEO_SHELF_SELECTOR +
+    ' :is(#visible-video-container, #hidden-video-container) > :is(ytd-rich-grid-media, yt-lockup-view-model)';
+  runtime.brandVideoShelfSelector = BRAND_VIDEO_SHELF_SELECTOR;
+  const HOME_PROMO_TYPE_SELECTOR = 'ytd-statement-banner-renderer';
+  const HOME_PROMO_SELECTOR = 'ytd-browse[page-subtype="home"] ' + HOME_PROMO_TYPE_SELECTOR;
+  runtime.homePromoTypeSelector = HOME_PROMO_TYPE_SELECTOR;
+  runtime.homePromoSelector = HOME_PROMO_SELECTOR;
+  const PLAYABLES_SHELF_TYPE_SELECTOR = 'ytd-rich-shelf-renderer:not([is-shorts]):is(' +
+    '[is-playables], [is-mini-game-card-shelf], [is-game-card-shelf], :has(ytd-mini-game-card-view-model))';
+  const PLAYABLES_SHELF_SELECTOR = 'ytd-browse[page-subtype="home"] ' + PLAYABLES_SHELF_TYPE_SELECTOR;
+  const PLAYABLES_CARD_TYPES = ':is(ytd-rich-item-renderer, .ytdRichItemRendererHost, ' +
+    'ytd-mini-game-card-view-model:not(:is(ytd-rich-item-renderer, .ytdRichItemRendererHost) *))';
+  runtime.playablesShelfSelector = PLAYABLES_SHELF_SELECTOR;
+  runtime.playablesShelfTypeSelector = PLAYABLES_SHELF_TYPE_SELECTOR;
+  runtime.playablesCardTypes = PLAYABLES_CARD_TYPES;
   const MEMBERSHIPS_PAGE_SELECTOR = 'ytd-browse[page-subtype="channel-memberships-shopfront"]:not([hidden])';
   const MEMBERSHIPS_PAGE_HERO_SELECTOR = MEMBERSHIPS_PAGE_SELECTOR + ' yt-sponsorships-destination-hub-header-view-model';
   const MEMBERSHIPS_PAGE_CARD_SELECTOR = MEMBERSHIPS_PAGE_SELECTOR + ' .ytLockupViewModelHost';
@@ -132,6 +151,9 @@
     "ytd-rich-item-renderer", "ytd-rich-section-renderer", "ytd-rich-shelf-renderer", "ytd-watch-metadata #description",
     TOPICS_SHELF_SELECTOR, TOPICS_SHELF_SELECTOR + " button",
     MEMBERSHIPS_SHELF_SELECTOR + " button",
+    BRAND_VIDEO_SHELF_SELECTOR, BRAND_VIDEO_CARD_SELECTOR,
+    HOME_PROMO_SELECTOR, HOME_PROMO_SELECTOR + ' button',
+    PLAYABLES_SHELF_SELECTOR + ' ' + PLAYABLES_CARD_TYPES,
     MEMBERSHIPS_PAGE_HERO_SELECTOR, MEMBERSHIPS_PAGE_CARD_SELECTOR, MEMBERSHIPS_PAGE_TITLE_SELECTOR,
     SEARCH_SHORTS_SHELF_SELECTOR, SEARCH_SHORTS_CARD_SELECTOR,
     "ytd-video-renderer", "ytd-compact-video-renderer", "yt-lockup-view-model",
@@ -171,6 +193,14 @@
     TOPICS_SHELF_SELECTOR + " ytd-rich-shelf-renderer",
     TOPICS_SHELF_SELECTOR + " ytd-rich-shelf-renderer .button-container",
     MEMBERSHIPS_SHELF_SELECTOR + " > #dismissible > .button-container",
+    BRAND_VIDEO_SHELF_SELECTOR + ' :is(#dismissible, #content-wrapper, #visible-content-wrapper, ' +
+      '#visible-video-container, #hidden-video-container, #metadata-container, #shelf-header-container, ' +
+      '#show-more-button-container, #bottom-button-container)',
+    HOME_PROMO_SELECTOR + ' :is(#dismissible, #statement-banner-content, #background-content, ' +
+      '#foreground-content, #details-container, #text-container, #badge-view-model-container, ' +
+      '#button-container, #button-wrapper)',
+    PLAYABLES_SHELF_SELECTOR + ' :is(#dismissible, #rich-shelf-header-container, ' +
+      '#rich-shelf-header, #contents-container, #contents, .button-container)',
     MEMBERSHIPS_PAGE_CLEAR_SELECTOR,
     SEARCH_SHORTS_FOOTER_SELECTOR,
     // Blur on the outer header moves its fixed descendants into a new containing block.
@@ -253,6 +283,10 @@
     .ytChipShapeChip, ytd-guide-entry-renderer, ytd-mini-guide-entry-renderer),
     ${TOPICS_SHELF_SELECTOR} button,
     ${MEMBERSHIPS_SHELF_SELECTOR} :is(ytd-rich-item-renderer, yt-lockup-view-model, button),
+    ${BRAND_VIDEO_CARD_SELECTOR},
+    ${BRAND_VIDEO_SHELF_SELECTOR} button,
+    ${HOME_PROMO_SELECTOR} button,
+    ${PLAYABLES_SHELF_SELECTOR} :is(${PLAYABLES_CARD_TYPES}, button),
     ytd-guide-renderer #footer,
     ${SEARCH_SHORTS_CARD_SELECTOR},
     ${SEARCH_SHORTS_SHELF_SELECTOR} .ytSpecButtonShapeNextHost,
@@ -632,14 +666,25 @@
             // A grid shelf becomes a Shorts surface when its first card arrives.
             const searchShelf = target.closest("ytd-search grid-shelf-view-model");
             if (searchShelf) glassElements.add(searchShelf);
-            // The badge can arrive after the cards, before its host reflects an attribute.
-            if (target.closest("#rich-shelf-header") ||
-                [...record.addedNodes, ...record.removedNodes].some(node => node.id === "rich-shelf-header")) {
-              const shelf = target.closest("ytd-rich-shelf-renderer");
-              if (shelf) glassRoots.add(shelf);
+            // A badge added, removed, or moved anywhere in the shelf can change
+            // which node owns the backdrop for all of its existing cards.
+            const membershipShelf = target.closest("ytd-rich-shelf-renderer");
+            if (membershipShelf && [...record.addedNodes, ...record.removedNodes].some(node =>
+                node instanceof Element && (node.matches('ytd-mini-game-card-view-model') ||
+                  node.querySelector('ytd-mini-game-card-view-model')))) {
+              glassRoots.add(membershipShelf);
+            }
+            if (membershipShelf && (target.closest('#rich-shelf-header, ' + MEMBERSHIPS_BADGE_SELECTOR +
+                ', ytd-badge-supported-renderer') ||
+                [...record.addedNodes, ...record.removedNodes].some(node =>
+                  node instanceof Element && (node.id === 'rich-shelf-header' ||
+                    node.matches(MEMBERSHIPS_BADGE_SELECTOR) ||
+                    node.querySelector(MEMBERSHIPS_BADGE_SELECTOR))))) {
+              glassRoots.add(membershipShelf);
             }
           }
-        } else if (glassEnabled() && (glassStyles.has(target) || mightBeGlassElement(target))) {
+        } else if (glassEnabled() && (glassStyles.has(target) || mightBeGlassElement(target) ||
+            record.attributeName === "class" && target.closest('ytd-badge-supported-renderer'))) {
           if (record.attributeName === "style") {
             const managed = glassStyles.get(target);
             const overridden = managed && [...managed].some(([property, original]) =>
@@ -662,11 +707,14 @@
               glassRoots.add(target);
             }
             // YouTube can identify or recycle a featured shelf after inserting its children.
-            if (["has-paygated-featured-badge", "is-shorts"].includes(record.attributeName) &&
+            if (["has-paygated-featured-badge", "is-shorts", "is-playables",
+                "is-mini-game-card-shelf", "is-game-card-shelf"].includes(record.attributeName) &&
                 target.matches("ytd-rich-shelf-renderer")) {
               glassRoots.add(target);
             }
-            if (record.attributeName === "hidden" && target.id === "paygated-featured-badge") {
+            if (["class", "hidden"].includes(record.attributeName) &&
+                (target.matches(MEMBERSHIPS_BADGE_SELECTOR) ||
+                  target.closest('ytd-badge-supported-renderer'))) {
               const shelf = target.closest("ytd-rich-shelf-renderer");
               if (shelf) glassRoots.add(shelf);
             }

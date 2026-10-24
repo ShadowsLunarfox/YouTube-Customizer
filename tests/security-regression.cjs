@@ -107,6 +107,16 @@ const fixture = `<!doctype html><style>
     const ping = await send(popup, {type:"YT_PROGRESS_PING"});
     assert.equal(ping.applied, true);
     assert.equal(ping.version, settings.version);
+    const windowUrl = popupUrl + '?window=1&target=' + (await popup.evaluate(async()=>{
+      const [tab]=await chrome.tabs.query({url:'https://www.youtube.com/shorts/security-fixture'});return tab.id;
+    })) + '&scope=shared&panel=appearance';
+    assert.equal(settings.isSettingsPageUrl(windowUrl,popupUrl),true,'the declared standalone menu is trusted');
+    for(const url of [windowUrl+'&extra=1',windowUrl+'&window=1',windowUrl+'#spoof',popupUrl+'?window=0',
+      popupUrl+'?window=1&target=-1',popupUrl+'?window=1&scope=other',popupUrl+'?window=1&panel=other',
+      'https://example.com/popup.html?window=1'])assert.equal(settings.isSettingsPageUrl(url,popupUrl),false,'other entry points remain untrusted');
+    const settingsWindow=await context.newPage();await settingsWindow.goto(windowUrl);await settingsWindow.waitForSelector('#settings-form:not([inert])');
+    assert.equal((await send(settingsWindow,{type:'YT_PROGRESS_PING'})).applied,true,'standalone menu messages are authenticated');
+    await settingsWindow.close();
     const preferences = { ...settings.defaults,themeEnabled:true,backgroundMode:"image",uiOpacity:42 };
     assert.equal((await send(popup,{type:"YT_PROGRESS_LIVE_PREVIEW",settings:preferences,assets:{}})).applied, true);
     assert.equal(await page.evaluate(() => document.documentElement.style.getPropertyValue('--ytc-ui-opacity')), "0.42");

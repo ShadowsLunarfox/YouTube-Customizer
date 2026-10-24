@@ -68,6 +68,56 @@ h1 {
   overflow-wrap: anywhere;
 }
 
+.title-bar h1 { flex: 1; }
+.title-bar button {
+  min-width: 0;
+  min-height: 22px;
+  padding: 3px 8px;
+  color: var(--dark);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+html[data-settings-window],
+html[data-settings-window] body {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+html[data-settings-window] .panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+html[data-settings-window] #settings-form {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+html[data-settings-window] .tab-content {
+  flex: 1;
+  height: auto;
+}
+
+html[data-settings-window] :is(.title-bar, .scope-controls, .tabs, .actions, .status-bar) {
+  flex-shrink: 0;
+}
+
+@media (max-width: 440px) {
+  html[data-settings-window] .field {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 160px);
+  }
+  html[data-settings-window] .range-field {
+    grid-template-columns: minmax(0, 1fr) minmax(64px, 1fr) 52px;
+  }
+  html[data-settings-window] .tabs button { padding-inline: 6px; }
+}
+
 .window-body {
   display: grid;
   gap: 10px;
@@ -226,7 +276,7 @@ form,
 }
 
 .tab-content {
-  height: 440px;
+  height: 340px;
   min-height: 0;
   max-width: 100%;
   overflow-x: hidden;
@@ -236,6 +286,14 @@ form,
   scrollbar-width: thin;
   scrollbar-color: #808080 var(--face);
 }
+
+.scope-controls {
+  display: grid;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.scope-controls .field-hint { min-height: 16px; }
 
 [role="tabpanel"] {
   display: grid;

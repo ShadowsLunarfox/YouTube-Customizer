@@ -36,6 +36,7 @@
     cardTitleLines: 2,
     equalCardHeights: true,
     hideHomePlayables: false,
+    hideHomeSingleVideo: false,
     hideHomeFeatured: false,
     hideHomeTopicShelves: false,
     hideHomeShopping: false,
@@ -75,7 +76,7 @@
     appearance: ["themeEnabled", "pageColor", "surfaceColor", "uiOpacity", "uiBlur", "textColor", "accentColor", "backgroundMode", "backgroundFit", "backgroundOpacity"],
     player: ["progressColor", "progressEffect", "bufferColor", "heatmapColor", "thumbColor", "thumbStyle", "barHeight", "thumbSize"],
     audio: audioKeys,
-    layout: ["videosPerRow", "customizeCards", "cardRadius", "cardBorderWidth", "cardPadding", "cardGap", "shelfSpacing", "cardTitleLines", "equalCardHeights", "hideHomePlayables", "hideHomeFeatured", "hideHomeTopicShelves", "hideHomeShopping", "disableVideoPreviews", "hideHomeTopicBar", "hideCreateButton", "hideNotificationsButton", "hideSidebarSubscriptions", "hideSidebarYou", "hideSidebarExplore", "hideSidebarMoreFromYouTube", "hideSidebarReportHistory", "relatedThumbnailWidth", "hideShorts", "hideRelated", "hideComments", "hideChat", "reduceAnimations"]
+    layout: ["videosPerRow", "customizeCards", "cardRadius", "cardBorderWidth", "cardPadding", "cardGap", "shelfSpacing", "cardTitleLines", "equalCardHeights", "hideHomePlayables", "hideHomeSingleVideo", "hideHomeFeatured", "hideHomeTopicShelves", "hideHomeShopping", "disableVideoPreviews", "hideHomeTopicBar", "hideCreateButton", "hideNotificationsButton", "hideSidebarSubscriptions", "hideSidebarYou", "hideSidebarExplore", "hideSidebarMoreFromYouTube", "hideSidebarReportHistory", "relatedThumbnailWidth", "hideShorts", "hideRelated", "hideComments", "hideChat", "reduceAnimations"]
   });
   const pageScopes = Object.freeze(["home", "watch", "music"]);
   const profileKeys = Object.freeze([...tabKeys.appearance, ...tabKeys.layout]);
@@ -279,7 +280,7 @@
   }
 
   globalThis.YTCustomizer = Object.freeze({
-    version: "110", defaults, assetDefaults, presets, tabKeys, audioKeys, normalize, normalizeAssets,
+    version: "119", defaults, assetDefaults, presets, tabKeys, audioKeys, normalize, normalizeAssets,
     pageScopes, profileKeys, cardKeys, normalizeProfiles, normalizePageAssets, pageScope, resolveSettings, resolveAssets, createBackup, parseBackup,
     isImageData, isBackgroundData, isYouTubeUrl, isSettingsPageUrl, iconDataUri
   });

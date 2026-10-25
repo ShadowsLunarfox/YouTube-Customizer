@@ -27,13 +27,18 @@ for(const change of [value=>value.schemaVersion=9,value=>value.settings.pageColo
   assert.throws(()=>api.parseBackup(JSON.stringify(backup)));
 }
 assert.equal(api.parseBackup(JSON.stringify(api.createBackup({cardRadius:9},{home:{enabled:true,settings:{uiOpacity:70}}},{backgroundImageData:gif},{},true))).settings.cardRadius,9);
+const hiddenBackup=api.parseBackup(JSON.stringify(api.createBackup({hideHomeSingleVideo:true},{home:{enabled:true,settings:{hideHomeSingleVideo:false,hideHomePlayables:true}}},{},{},false)));
+assert.equal(hiddenBackup.settings.hideHomeSingleVideo,true);
+assert.equal(hiddenBackup.pageProfiles.home.settings.hideHomeSingleVideo,false);
+assert.equal(hiddenBackup.pageProfiles.home.settings.hideHomePlayables,true);
+assert.equal(api.parseBackup(JSON.stringify({format:'youtube-customizer',schemaVersion:1,settings:{hideHomeFeatured:true}})).settings.hideHomeSingleVideo,false,'older backups keep working without the new switch');
 
 function video(i, tag = 'ytd-rich-grid-media') {
   return `<${tag} data-video><yt-thumbnail-view-model><img src="${gif}" alt="Video ${i}"></yt-thumbnail-view-model><h3 class="ytLockupMetadataViewModelTitle">${i===0?'A long video title that wraps onto several lines to exercise consistent card heights':'Video '+i}</h3></${tag}>`;
 }
 const native = `<style>
   body{margin:0;font:14px Arial;background:#111;color:#eee} [hidden]{display:none!important}
-  ytd-app,ytd-page-manager,ytd-browse,ytd-rich-grid-renderer,ytd-rich-grid-row,ytd-rich-section-renderer,ytd-rich-shelf-renderer,ytd-brand-video-shelf-renderer,ytd-rich-grid-media,yt-lockup-view-model,yt-thumbnail-view-model,ytmusic-app,ytmusic-carousel-shelf-renderer,ytmusic-two-row-item-renderer{display:block}
+  ytd-app,ytd-page-manager,ytd-browse,ytd-rich-grid-renderer,ytd-rich-grid-row,ytd-rich-section-renderer,ytd-rich-shelf-renderer,ytd-brand-video-shelf-renderer,ytd-brand-video-singleton-renderer,ytd-statement-banner-renderer,ytd-rich-grid-media,yt-lockup-view-model,yt-thumbnail-view-model,ytmusic-app,ytmusic-carousel-shelf-renderer,ytmusic-two-row-item-renderer{display:block}
   ytd-rich-grid-renderer{padding:24px;box-sizing:border-box;width:100%} ytd-rich-grid-renderer>#contents{display:flex;flex-wrap:wrap}
   ytd-rich-grid-row{width:100%} ytd-rich-grid-row>#contents{display:flex;align-items:flex-start}
   ytd-rich-item-renderer{display:block;box-sizing:border-box;width:calc(100% / var(--ytd-rich-grid-items-per-row,4) - 12px);margin:0 6px 24px}
@@ -54,6 +59,8 @@ const native = `<style>
 const homeBody = `<ytd-app><ytd-page-manager><ytd-browse page-subtype="home"><ytd-rich-grid-renderer><div id="contents">
   <ytd-rich-grid-row><div id="contents">${Array.from({length:4},(_,i)=>`<ytd-rich-item-renderer id="card-${i}"><div id="content">${video(i)}</div></ytd-rich-item-renderer>`).join('')}</div></ytd-rich-grid-row>
   <ytd-rich-section-renderer id="playables-section"><div id="content"><ytd-rich-shelf-renderer is-playables><div id="dismissible"><div id="rich-shelf-header">Playables</div><div id="contents-container"><div id="contents"><ytd-rich-item-renderer><ytd-mini-game-card-view-model>Game</ytd-mini-game-card-view-model></ytd-rich-item-renderer></div></div><div class="button-container"><button>Show more</button></div></div></ytd-rich-shelf-renderer></div></ytd-rich-section-renderer>
+  <ytd-rich-section-renderer id="single-video-section"><div id="content"><ytd-brand-video-singleton-renderer><div id="dismissible"><div id="spatial-heading" hidden>Featured video</div><div id="content-wrapper"><div id="thumbnail-container">${video(6)}</div><div id="metadata-container"><div id="metadata-text-container">Watch with Premium</div></div></div></div></ytd-brand-video-singleton-renderer></div></ytd-rich-section-renderer>
+  <ytd-rich-section-renderer id="image-promo-section"><div id="content"><ytd-statement-banner-renderer><div id="dismissible">Premium image promotion</div></ytd-statement-banner-renderer></div></ytd-rich-section-renderer>
   <ytd-rich-section-renderer id="featured-section"><div id="content"><ytd-brand-video-shelf-renderer><div id="dismissible"><div id="content-wrapper"><div id="shelf-header-container"><div id="section-header-container">Memberships</div></div><div id="visible-content-wrapper"><div id="metadata-container" hidden></div><div id="visible-video-container">${video(5,'yt-lockup-view-model')}</div></div></div></div></ytd-brand-video-shelf-renderer></div></ytd-rich-section-renderer>
   <ytd-rich-section-renderer id="topics-section"><div id="content"><ytd-chips-shelf-with-video-shelf-renderer>Topic recommendations</ytd-chips-shelf-with-video-shelf-renderer></div></ytd-rich-section-renderer>
   <ytd-rich-section-renderer id="shopping-section"><div id="content"><ytd-brand-video-shelf-renderer has-sku-view-model><div id="dismissible">Shopping recommendations</div></ytd-brand-video-shelf-renderer></div></ytd-rich-section-renderer>
@@ -82,7 +89,8 @@ const musicBody = `<ytmusic-app><ytmusic-carousel-shelf-renderer><div id="items"
     async function activateHome(){await popup.evaluate(async()=>{const tabs=await chrome.tabs.query({url:'https://www.youtube.com/'});await chrome.tabs.update(tabs[0].id,{active:true});});}
     await activateHome();await edit('themeEnabled',true);await edit('pageColor','#112233');
     await popup.locator('#tab-layout').click();await edit('customizeCards',true);
-    for(const[key,value]of Object.entries({cardRadius:24,cardBorderWidth:3,cardPadding:14,cardGap:20,shelfSpacing:22,cardTitleLines:3,videosPerRow:4}))await edit(key,value);
+    const geometrySettings={cardRadius:24,cardBorderWidth:3,cardPadding:14,cardGap:20,shelfSpacing:22,cardTitleLines:3,videosPerRow:4};
+    for(const[key,value]of Object.entries(geometrySettings))await edit(key,value);
     await home.waitForFunction(()=>getComputedStyle(document.querySelector('#card-0')).borderTopWidth==='3px');
     for(const width of [1440,800,390]){
       await home.setViewportSize({width,height:1000});
@@ -98,14 +106,33 @@ const musicBody = `<ytmusic-app><ytmusic-carousel-shelf-renderer><div id="items"
     await home.waitForFunction(()=>getComputedStyle(document.querySelector('#card-0 h3')).minHeight==='0px');
     assert.ok(await home.locator('#card-0').evaluate(el=>el.getBoundingClientRect().height>document.querySelector('#card-1').getBoundingClientRect().height),'equal-height can be turned off');
     await edit('equalCardHeights',true);
-    for(const[key,section]of Object.entries({hideHomePlayables:'playables-section',hideHomeFeatured:'featured-section',hideHomeTopicShelves:'topics-section',hideHomeShopping:'shopping-section'})){
+    for(const[key,section]of Object.entries({hideHomeSingleVideo:'single-video-section',hideHomePlayables:'playables-section',hideHomeFeatured:'featured-section',hideHomeTopicShelves:'topics-section',hideHomeShopping:'shopping-section'})){
       await edit(key,true);await home.waitForFunction(id=>getComputedStyle(document.getElementById(id)).display==='none',section);
+      if(key==='hideHomeSingleVideo'||key==='hideHomePlayables'){
+        for(const other of [key==='hideHomeSingleVideo'?'playables-section':'single-video-section','featured-section','image-promo-section'])assert.notEqual(await home.locator('#'+other).evaluate(el=>getComputedStyle(el).display),'none','individual switches leave other Home sections visible');
+      }
       if(key==='hideHomeFeatured')assert.notEqual(await home.locator('#shopping-section').evaluate(el=>getComputedStyle(el).display),'none','shopping has its own toggle');
       await edit(key,false);await home.waitForFunction(id=>getComputedStyle(document.getElementById(id)).display!=='none',section);
     }
     await edit('themeEnabled',false);await edit('hideHomePlayables',true);
     await home.waitForFunction(()=>getComputedStyle(document.querySelector('#playables-section')).display==='none');
     await edit('hideHomePlayables',false);await edit('themeEnabled',true);
+    await popup.locator('#hideHomeSingleVideo').check();await popup.locator('#hideHomePlayables').check();
+    await home.waitForFunction(()=>['single-video-section','playables-section'].every(id=>getComputedStyle(document.getElementById(id)).display==='none'));
+    await popup.waitForFunction(async()=>{const s=await chrome.storage.sync.get(['hideHomeSingleVideo','hideHomePlayables']);return s.hideHomeSingleVideo&&s.hideHomePlayables});
+    assert.equal(await home.locator('#single-video-section').evaluate(el=>el.getBoundingClientRect().height),0,'hidden single-video section leaves no feed height');
+    assert.equal(await home.locator('#playables-section').evaluate(el=>el.getBoundingClientRect().height),0,'hidden Playables section leaves no feed height');
+    await popup.reload();await popup.waitForSelector('#settings-form:not([inert])');await popup.locator('#tab-layout').click();
+    assert.equal(await popup.locator('#hideHomeSingleVideo').isChecked(),true);assert.equal(await popup.locator('#hideHomePlayables').isChecked(),true);
+    assert.equal(await popup.locator('#layout-panel fieldset').first().locator('legend').textContent(),'Home sections','the requested switches are easy to find at the top');
+    await edit('themeEnabled',false);
+    assert.equal(await home.locator('#single-video-section').evaluate(el=>getComputedStyle(el).display),'none','single-video hide works with the theme off');
+    await popup.locator('#reset').click();
+    await home.waitForFunction(()=>['single-video-section','playables-section'].every(id=>getComputedStyle(document.getElementById(id)).display!=='none'));
+    assert.equal(await popup.locator('#hideHomeSingleVideo').isChecked(),false);assert.equal(await popup.locator('#hideHomePlayables').isChecked(),false);
+    await edit('customizeCards',true);
+    for(const[key,value]of Object.entries(geometrySettings))await edit(key,value);
+    await edit('themeEnabled',true);
 
     await popup.locator('#tab-appearance').click();await popup.locator('#backgroundImage').setInputFiles({name:'shared.gif',mimeType:'image/gif',buffer:Buffer.from(gif.split(',')[1],'base64')});
     await popup.waitForFunction(()=>!document.querySelector('#settings-form').inert&&!document.querySelector('#removeBackground').hidden);
@@ -120,7 +147,9 @@ const musicBody = `<ytmusic-app><ytmusic-carousel-shelf-renderer><div id="items"
     await popup.waitForFunction(async()=>(await chrome.storage.local.get('pageProfiles')).pageProfiles?.home?.enabled);
     assert.equal(await popup.evaluate(async()=>(await chrome.storage.sync.get('pageColor')).pageColor),'#112233','page edits do not overwrite shared settings');
     await waitColor(home,'#345678');
-    await popup.locator('#tab-layout').click();await edit('cardRadius',8);await edit('hideHomePlayables',true);
+    await popup.locator('#tab-layout').click();await edit('cardRadius',8);await edit('hideHomePlayables',true);await edit('hideHomeSingleVideo',true);
+    assert.equal(await popup.evaluate(async()=>(await chrome.storage.sync.get('hideHomeSingleVideo')).hideHomeSingleVideo),false,'Home-specific hiding preserves the shared switch');
+    await home.waitForFunction(()=>getComputedStyle(document.querySelector('#single-video-section')).display==='none');
     await popup.locator('#tab-appearance').click();await popup.locator('#backgroundImage').setInputFiles({name:'home.gif',mimeType:'image/gif',buffer:Buffer.from(gif.split(',')[1],'base64')});
     await popup.waitForFunction(async()=>(await chrome.storage.local.get('pageAssets')).pageAssets?.home?.backgroundImageData?.startsWith('data:image/gif;'));
     await home.waitForFunction(()=>document.documentElement.hasAttribute('data-ytc-custom-background'));
@@ -157,6 +186,7 @@ const musicBody = `<ytmusic-app><ytmusic-carousel-shelf-renderer><div id="items"
     const backupPath=path.join(os.tmpdir(),'ytc-configuration-backup.json');await download.saveAs(backupPath);
     const backup=JSON.parse(fs.readFileSync(backupPath,'utf8'));
     assert.equal(backup.settings.pageColor,'#112233');assert.equal(backup.pageProfiles.home.settings.pageColor,'#345678');
+    assert.equal(backup.settings.hideHomeSingleVideo,false);assert.equal(backup.pageProfiles.home.settings.hideHomeSingleVideo,true);assert.equal(backup.pageProfiles.home.settings.hideHomePlayables,true);
     assert.equal(backup.pageProfiles.watch.settings.uiOpacity,65);assert.equal(backup.pageProfiles.music.settings.uiOpacity,82);
     assert.equal(backup.pageAssets.home.backgroundImageData,gif);assert.equal(backup.pageAssets.music.backgroundImageData,musicImage);
     const storageSnapshot=()=>popup.evaluate(async()=>JSON.stringify(await Promise.all([chrome.storage.sync.get(null),chrome.storage.local.get(null)])));
@@ -171,6 +201,7 @@ const musicBody = `<ytmusic-app><ytmusic-carousel-shelf-renderer><div id="items"
     await popup.locator('#tab-appearance').click();await edit('pageColor','#aa3344');
     await popup.locator('#tab-backup').click();await popup.locator('#backupFile').setInputFiles(backupPath);
     await popup.waitForFunction(async()=>!document.querySelector('#settings-form').inert&&(await chrome.storage.sync.get('pageColor')).pageColor==='#112233');
+    await home.waitForFunction(()=>getComputedStyle(document.querySelector('#single-video-section')).display==='none');
     assert.equal(await popup.evaluate(async()=>(await chrome.storage.local.get('pageAssets')).pageAssets.music.backgroundImageData),musicImage);
     await popup.locator('#includeBackupMedia').uncheck();const settingsDownloadPromise=popup.waitForEvent('download');await popup.locator('#exportSettings').click();
     const settingsDownload=await settingsDownloadPromise,settingsPath=path.join(os.tmpdir(),'ytc-configuration-settings-only.json');await settingsDownload.saveAs(settingsPath);
@@ -193,6 +224,6 @@ const musicBody = `<ytmusic-app><ytmusic-carousel-shelf-renderer><div id="items"
     await popup.locator('#resetAll').click();await home.waitForFunction(()=>!document.documentElement.hasAttribute('data-ytc-theme'));
     assert.equal(await popup.evaluate(async()=>Object.keys((await chrome.storage.local.get('pageProfiles')).pageProfiles).length),0,'Reset all clears page overrides');
     assert.deepEqual(errors,[]);
-    console.log('PASS: card geometry/title lines/columns, four independent Home sections, shared/Home/Watch/Music settings and media, SPA switches, override disable/restore, full/settings-only backup files, invalid imports without writes, 480px popup and reset.');
+    console.log('PASS: card geometry/title lines/columns, independent single-video and Playables UI switches, no reserved hidden space, saved/reopened switches, theme-off hiding, Layout reset, Home override and backup compatibility, shared/Home/Watch/Music settings and media, SPA switches, full/settings-only backup files, invalid imports, 480px popup and reset.');
   }finally{clearTimeout(deadline);await context.close();}
 })().catch(error=>{console.error(error);process.exitCode=1});

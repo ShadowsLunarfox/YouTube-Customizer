@@ -7,13 +7,14 @@
   const membershipsShelf = 'html[data-ytc-theme] ' + runtime.membershipsShelfSelector;
   const brandShelf = 'html[data-ytc-theme] ' + runtime.brandVideoShelfSelector;
   const promo = 'html[data-ytc-theme] ' + runtime.homePromoSelector;
+  const singletonPromo = 'html[data-ytc-theme] ' + runtime.singletonPromoSelector;
   const promoSection = 'html[data-ytc-theme] ytd-browse[page-subtype="home"] ' +
     `ytd-rich-section-renderer:has(${runtime.homePromoTypeSelector})`;
   const playablesShelf = 'html[data-ytc-theme] ' + runtime.playablesShelfSelector + ':has(> #dismissible)';
   const playablesSection = 'html[data-ytc-theme] ytd-browse[page-subtype="home"] ' +
     `ytd-rich-section-renderer:has(${runtime.playablesShelfTypeSelector})`;
   const playablesCard = runtime.playablesCardTypes;
-  const membershipsAndBrand = `:is(${membershipsShelf}, ${brandShelf})`;
+  const videoCardScopes = `:is(${membershipsShelf}, ${brandShelf}, ${singletonPromo})`;
   const standaloneCard = ':is(yt-lockup-view-model, ytd-rich-grid-media)' +
     ':not(ytd-rich-item-renderer *, yt-lockup-view-model *)';
   const featuredShelf = `:is(${topicsShelf}, ${membershipsShelf}, ${brandShelf}, ${playablesShelf}, ${promo})`;
@@ -199,32 +200,32 @@
       --yt-icon-button-icon-color: var(--yt-spec-text-primary) !important;
     }
     /* Stretch each card to its row's height without changing native hidden items. */
-    ${membershipsAndBrand} ytd-rich-item-renderer:not([hidden]),
-    ${membershipsAndBrand} ytd-rich-item-renderer > #content,
+    ${videoCardScopes} ytd-rich-item-renderer:not([hidden]),
+    ${videoCardScopes} ytd-rich-item-renderer > #content,
     ${brandShelf} ${standaloneCard}:not([hidden]) {
       display: flex !important;
       flex-direction: column !important;
       flex: 1 !important;
     }
-    ${membershipsAndBrand} :is(yt-lockup-view-model, ytd-rich-grid-media) {
+    ${videoCardScopes} :is(yt-lockup-view-model, ytd-rich-grid-media) {
       width: 100% !important;
       min-width: 0 !important;
     }
     /* Modern lockups put their fixed native width on an inner host wrapper. */
-    ${membershipsAndBrand} yt-lockup-view-model > .ytLockupViewModelHost {
+    ${videoCardScopes} yt-lockup-view-model > .ytLockupViewModelHost {
       width: 100% !important;
       min-width: 0 !important;
       max-width: 100% !important;
     }
     /* Reserve a separate menu column so titles, logos, and badges stay readable. */
-    ${membershipsAndBrand} :is(.ytLockupMetadataViewModelTextContainer,
+    ${videoCardScopes} :is(.ytLockupMetadataViewModelTextContainer,
       .yt-lockup-metadata-view-model__text-container,
       .yt-lockup-metadata-view-model-wiz__text-container, ytd-rich-grid-media #meta) {
       flex: 1 !important;
       min-width: 0 !important;
       padding-right: 0 !important;
     }
-    ${membershipsAndBrand} :is(.ytLockupMetadataViewModelMenuButton,
+    ${videoCardScopes} :is(.ytLockupMetadataViewModelMenuButton,
       .yt-lockup-metadata-view-model__menu-button,
       .yt-lockup-metadata-view-model-wiz__menu-button, ytd-rich-grid-media #menu,
       ytd-rich-grid-media ytd-menu-renderer:not(#menu *)) {
@@ -235,21 +236,21 @@
       align-self: flex-start !important;
       margin: -6px 0 0 8px !important;
     }
-    ${membershipsAndBrand} ytd-rich-grid-media :is(#menu, ytd-menu-renderer:not(#menu *)) {
+    ${videoCardScopes} ytd-rich-grid-media :is(#menu, ytd-menu-renderer:not(#menu *)) {
       margin-top: 6px !important;
     }
-    ${membershipsAndBrand} ytd-rich-grid-media #menu ytd-menu-renderer {
+    ${videoCardScopes} ytd-rich-grid-media #menu ytd-menu-renderer {
       position: static !important;
       margin: 0 !important;
     }
-    ${membershipsAndBrand} :is(.ytLockupMetadataViewModelMenuButton,
+    ${videoCardScopes} :is(.ytLockupMetadataViewModelMenuButton,
       .yt-lockup-metadata-view-model__menu-button,
       .yt-lockup-metadata-view-model-wiz__menu-button, ytd-rich-grid-media #menu,
       ytd-rich-grid-media ytd-menu-renderer) button {
       min-width: 40px !important;
       min-height: 40px !important;
     }
-    ${membershipsAndBrand} :is(.ytLockupMetadataViewModelTitle,
+    ${videoCardScopes} :is(.ytLockupMetadataViewModelTitle,
       .yt-lockup-metadata-view-model__title, .yt-lockup-metadata-view-model-wiz__title) {
       padding-right: 0 !important;
     }
@@ -417,6 +418,64 @@
     ${promo} #attached-survey {
       min-width: 0 !important;
       max-width: 100% !important;
+    }
+
+    /* Single-video campaigns use a separate template with negative feed margins
+       and native column-dependent widths. Keep their video and copy in one frame. */
+    ${singletonPromo} :is(#content-wrapper, #thumbnail-container, #metadata-container,
+      #metadata-text-container, #metadata-video-container) {
+      box-sizing: border-box !important;
+      width: 100% !important;
+      min-width: 0 !important;
+      max-width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    ${singletonPromo} > #dismissible > #content-wrapper:not([hidden]) {
+      display: flex !important;
+      flex-flow: row wrap !important;
+      align-items: center !important;
+      gap: var(--ytc-card-gap, 16px) !important;
+      overflow: visible !important;
+    }
+    ${singletonPromo} #thumbnail-container {
+      flex: 1 1 240px !important;
+      max-width: 380px !important;
+      align-self: flex-start !important;
+    }
+    ${singletonPromo} #metadata-container {
+      flex: 1 1 320px !important;
+      flex-direction: column !important;
+      align-items: stretch !important;
+      justify-content: center !important;
+      align-self: stretch !important;
+    }
+    ${singletonPromo} #metadata-video-container {
+      max-width: 380px !important;
+      margin-top: 12px !important;
+    }
+    ${singletonPromo} #title-container {
+      font-size: clamp(20px, 2vw, 28px) !important;
+      line-height: 1.3 !important;
+      overflow-wrap: anywhere !important;
+      color: var(--yt-spec-text-primary) !important;
+    }
+    ${singletonPromo} #title-container #title {
+      font-size: inherit !important;
+      line-height: inherit !important;
+      max-height: none !important;
+      white-space: normal !important;
+      -webkit-line-clamp: unset !important;
+    }
+    ${singletonPromo} #featured-badge-container {
+      color: var(--yt-spec-text-secondary) !important;
+    }
+    ${singletonPromo} #button-container {
+      align-self: flex-start !important;
+      margin-inline: 0 !important;
+    }
+    ${singletonPromo}:has(#overflow-button > *) > #dismissible > #content-wrapper {
+      padding-inline-end: 40px !important;
     }
 
     /* Reserve feed space on the section itself so shelf margins cannot collapse.

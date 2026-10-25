@@ -69,6 +69,7 @@ h1 {
 }
 
 .title-bar h1 { flex: 1; }
+#menuLanguage { flex: 0 0 104px; width: 104px; height: 22px; font-size: 11px; color: #000; }
 .title-bar button {
   min-width: 0;
   min-height: 22px;
@@ -104,7 +105,7 @@ html[data-settings-window] .tab-content {
   height: auto;
 }
 
-html[data-settings-window] :is(.title-bar, .scope-controls, .tabs, .actions, .status-bar) {
+html[data-settings-window] :is(.title-bar, .settings-search, .scope-controls, .tabs, .actions, .status-bar) {
   flex-shrink: 0;
 }
 
@@ -276,7 +277,7 @@ form,
 }
 
 .tab-content {
-  height: 340px;
+  height: 306px;
   min-height: 0;
   max-width: 100%;
   overflow-x: hidden;
@@ -441,6 +442,19 @@ input[type="checkbox"]:checked::after {
   font-size: 11px;
 }
 
+.audio-monitor { display: grid; gap: 6px; font-size: 11px; }
+.audio-monitor-heading { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 3px 12px; }
+.audio-meter-row { display: grid; grid-template-columns: 12px minmax(0, 1fr) 76px; align-items: center; gap: 6px; }
+.audio-meter-row output { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.audio-meter { position: relative; height: 15px; overflow: hidden; background: #161d16; box-shadow: var(--sunken); }
+.audio-meter-fill { position: absolute; inset: 2px; background: linear-gradient(90deg, #16b44c 0% 75%, #f3cd28 75% 90%, #f05040 90%); clip-path: inset(0 calc(100% - var(--level, 0%)) 0 0); }
+.audio-meter-peak { position: absolute; top: 2px; bottom: 2px; left: clamp(2px, var(--peak, 0%), calc(100% - 3px)); width: 2px; background: white; opacity: var(--peak-visible, 0); }
+.audio-meter[data-clipping="true"] { outline: 1px solid #a00000; }
+.audio-meter-scale { display: flex; justify-content: space-between; margin: -3px 82px 0 18px; font-size: 10px; color: #404040; }
+.audio-parameters { display: grid; gap: 3px; margin: 2px 0 0; padding-top: 5px; border-top: 1px solid var(--shadow); }
+.audio-parameters > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 12px; }
+.audio-parameters dd { margin: 0; font-variant-numeric: tabular-nums; }
+
 .field {
   display: grid;
   grid-template-columns: minmax(110px, 1fr) minmax(0, 220px);
@@ -493,6 +507,37 @@ select {
   background-color: var(--light);
   box-shadow: var(--sunken);
 }
+
+/* Keep browser keyboard/accessibility behavior while styling both the field and its picker. */
+@supports (appearance: base-select) {
+  select, select::picker(select) { appearance: base-select; }
+  select { display: inline-flex; align-items: center; justify-content: space-between; gap: 4px; padding: 3px 3px 3px 6px; }
+  select::picker-icon { content: "▼"; display: grid; place-items: center; align-self: stretch; flex: 0 0 18px; width: 18px; margin: 0; color: #000; background: var(--face); box-shadow: var(--raised); font-size: 9px; transform: none; }
+  select:open::picker-icon { box-shadow: var(--sunken); }
+  select::picker(select) { min-width: anchor-size(self-inline); max-height: min(260px, 55vh); margin: 0; padding: 2px; border: 0; border-radius: 0; background: #fff; color: #000; box-shadow: var(--raised), 2px 2px #000; font: 13px/1.4 Tahoma, "Microsoft Sans Serif", sans-serif; }
+  select option { display: block; min-height: 21px; padding: 2px 5px; border: 0; border-radius: 0; color: #000; background: #fff; white-space: normal; overflow-wrap: anywhere; }
+  select option::checkmark { display: none; }
+  select option:is(:checked, :hover, :focus-visible) { color: #fff; background: #000080; }
+  select:has(option:is(:hover, :focus-visible)) option:checked:not(:hover, :focus-visible) { color: #000; background: #fff; }
+  select option:disabled { color: #808080; background: #fff; }
+}
+
+.settings-search { position: relative; display: flex; align-items: center; gap: 6px; height: 26px; margin-bottom: 8px; min-width: 0; }
+.settings-search > label { flex: none; font-size: 11px; }
+#settingsSearch { flex: 1; width: 100%; min-width: 0; height: 26px; padding: 3px 7px; border: 0; border-radius: 0; background: #fff; color: #000; box-shadow: var(--sunken); font: inherit; }
+#settingsSearch::-webkit-search-cancel-button { display: none; }
+#clearSettingsSearch { min-width: 25px; min-height: 24px; padding: 0; font-size: 17px; }
+.search-shortcut { flex: none; font-size: 10px; color: #404040; }
+.search-results { position: absolute; z-index: 20; top: calc(100% + 2px); left: 0; right: 0; max-height: min(260px, 50vh); overflow-y: auto; overflow-x: hidden; padding: 3px; color: #000; background: #fff; box-shadow: var(--raised), 2px 2px #000; }
+#settingsSearchCount { margin: 0; padding: 4px 6px; border-bottom: 1px solid #c0c0c0; background: #c0c0c0; font-size: 11px; }
+#settingsSearchList { display: grid; gap: 0; }
+.search-result { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; min-width: 0; min-height: 42px; padding: 5px 7px; background: #fff; color: #000; box-shadow: none; text-align: start; }
+.search-result strong { font-size: 12px; font-weight: 400; }
+.search-result span { font-size: 10px; color: #505050; }
+.search-result:is(:hover, :focus-visible) { color: #fff; background: #000080; outline: 1px dotted #fff; outline-offset: -3px; box-shadow: none; }
+.search-result:is(:hover, :focus-visible) span { color: #fff; }
+#settingsSearchEmpty { margin: 0; padding: 14px 7px; font-size: 11px; }
+.search-highlight { outline: 1px dotted #000080; outline-offset: 3px; background-color: #ffffdf; }
 
 .range-field {
   grid-template-columns: minmax(110px, 1fr) minmax(100px, 160px) 52px;

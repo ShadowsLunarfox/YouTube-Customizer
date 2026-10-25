@@ -14,6 +14,8 @@ const previewThumb = document.querySelector(".preview-thumb");
 const themePreview = document.querySelector(".theme-preview");
 const themePreviewVideo = document.querySelector(".theme-preview-wallpaper");
 const tabs = [...document.querySelectorAll('[role="tab"]')];
+const settingsSearch = YTCustomizerSettingsSearch.create({ activateTab: tab => activateTab(tab) });
+const localization = YTCustomizerI18n.create(document, document.getElementById("menuLanguage"), message => showStatus(message, true));
 const assetControls = {
   customIconData: { input: "customIcon", upload: "uploadCustomIcon", remove: "removeCustomIcon" },
   backgroundImageData: { input: "backgroundImage", upload: "uploadBackground", remove: "removeBackground" }
@@ -45,6 +47,13 @@ const requestedTab = windowParameters.get("target");
 let previewTabId = isSettingsWindow && /^\d+$/.test(requestedTab || "") && Number.isSafeInteger(Number(requestedTab))
   ? Number(requestedTab) : undefined;
 const openWindowButton = document.getElementById("openWindow");
+const pictureInPictureButton = document.getElementById("pictureInPicture");
+const pictureInPictureStatus = document.getElementById("pictureInPictureStatus");
+let pictureInPictureBusy = false;
+let pictureInPictureRevision = 0;
+let audioMeterTimer;
+let audioMeterRevision = 0;
+let audioMeterClosed = false;
 if (isSettingsWindow) {
   document.documentElement.setAttribute("data-settings-window", "");
   openWindowButton.hidden = true;
@@ -64,6 +73,67 @@ async function getPreviewTab() {
   previewTabId = tab?.id;
   return tab;
 }
+
+async function updatePictureInPicture(action = "status") {
+  if (pictureInPictureBusy) return;
+  const revision = ++pictureInPictureRevision;
+  const toggle = action === "toggle";
+  if (toggle) {
+    pictureInPictureBusy = true;
+    pictureInPictureButton.disabled = true;
+    pictureInPictureStatus.textContent = "Updating picture-in-picture...";
+  }
+  try {
+    const tab = await getPreviewTab();
+    if (!tab?.id || !isYouTubeUrl(tab.url)) throw new Error("Open a YouTube video to use picture-in-picture.");
+    // executeScript preserves the extension button's user gesture. A background
+    // message alone cannot reliably provide the activation needed by native PiP.
+    const [injection] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id, frameIds: [0] },
+      func: YTCustomizerPictureInPicture.execute, args: [action]
+    });
+    if (revision !== pictureInPictureRevision) return;
+    const result = injection?.result;
+    if (!result) throw new Error("Could not reach the video. Refresh YouTube and try again.");
+    pictureInPictureButton.textContent = result.active ? "Return video to tab" : "Open floating video";
+    pictureInPictureButton.setAttribute("aria-pressed", String(Boolean(result.active)));
+    pictureInPictureStatus.textContent = result.error || (result.active
+      ? "Picture-in-picture is open. You can keep watching while using other windows."
+      : "Open the current video in a floating window. Click again to return it to its tab.");
+  } catch (error) {
+    if (revision !== pictureInPictureRevision) return;
+    pictureInPictureButton.textContent = "Open floating video";
+    pictureInPictureButton.setAttribute("aria-pressed", "false");
+    pictureInPictureStatus.textContent = toggle && !error.message.startsWith("Open a YouTube")
+      ? "Could not reach the video. Refresh YouTube and try again." : error.message;
+  } finally {
+    if (toggle) { pictureInPictureBusy = false; pictureInPictureButton.disabled = false; }
+  }
+}
+
+pictureInPictureButton.addEventListener("click", () => void updatePictureInPicture("toggle"));
+
+async function updateShortcuts() {
+  const outputs = { _execute_action: 'shortcutMenu', 'toggle-picture-in-picture': 'shortcutPictureInPicture', 'toggle-audio-enhancement': 'shortcutAudio' };
+  try {
+    const commands = await chrome.commands.getAll();
+    for (const [name, id] of Object.entries(outputs)) document.getElementById(id).textContent =
+      commands.find(command => command.name === name)?.shortcut || 'Not assigned';
+  } catch {
+    for (const id of Object.values(outputs)) document.getElementById(id).textContent = 'Could not load shortcuts';
+  }
+}
+
+document.getElementById('configureShortcuts').addEventListener('click', async () => {
+  try {
+    if (saveTimer !== undefined && !await saveSettings()) return;
+    const scheme = /Edg\//.test(navigator.userAgent) ? 'edge' : 'chrome';
+    const windows = await chrome.windows.getAll({ windowTypes: ['normal'] });
+    const target = windows.find(window => window.focused) || windows[0];
+    if (target) await chrome.tabs.create({ windowId: target.id, url: scheme + '://extensions/shortcuts' });
+    else await chrome.windows.create({ url: scheme + '://extensions/shortcuts', type: 'normal' });
+  } catch { showStatus('Could not open shortcut settings', true); }
+});
 
 function settingsWindowUrl(tabId, scope, panel) {
   const url = new URL(chrome.runtime.getURL("popup.html"));
@@ -109,7 +179,7 @@ async function focusSettingsWindow(context) {
   history.replaceState(null, "", settingsWindowUrl(previewTabId, editingScope, activeTab));
   connectionPromise = undefined;
   lastSentAssets = {};
-  applyToCurrentTab();
+  void checkCurrentTabConnection();
   return chrome.windows.getCurrent();
 }
 
@@ -140,7 +210,12 @@ openWindowButton.addEventListener("click", async () => {
 });
 
 window.addEventListener("focus", async () => {
-  try { if (await refreshStoredConfiguration()) applyToCurrentTab(); }
+  try {
+    if (await refreshStoredConfiguration()) void checkCurrentTabConnection();
+    if (initialized && activeTab === "player") void updatePictureInPicture();
+    if (initialized) void updateShortcuts();
+    syncAudioMonitor();
+  }
   catch { showStatus("Could not refresh settings", true); }
 });
 
@@ -300,7 +375,70 @@ function updateAudioStatus(status) {
     messages[status] || "Play a video to apply audio settings. Click the video once if needed.";
 }
 
+function renderAudioMonitor(audio, error) {
+  const dbText = value => value === null ? "−∞" : (value > 0 ? "+" : "") + value.toFixed(1);
+  for (const [index, side] of ["Left", "Right"].entries()) {
+    const channel = audio?.channels?.[index];
+    const meter = document.getElementById("audioMeter" + side);
+    const percent = value => value === null || value === undefined ? 0 : Math.max(0, Math.min(100, (value + 60) / 60 * 100));
+    meter.style.setProperty("--level", percent(channel?.rmsDb) + "%");
+    meter.style.setProperty("--peak", percent(channel?.peakDb) + "%");
+    meter.style.setProperty("--peak-visible", channel?.peakDb != null ? "1" : "0");
+    meter.dataset.clipping = String(channel?.peakDb >= 0 && channel?.peakDb != null);
+    meter.setAttribute("aria-valuenow", String(Math.max(-60, Math.min(0, channel?.rmsDb ?? -60))));
+    meter.setAttribute("aria-valuetext", channel ? `RMS ${dbText(channel.rmsDb)} dBFS, peak ${dbText(channel.peakDb)} dBFS` : "Unavailable");
+    document.getElementById("audioLevel" + side).textContent = (channel ? dbText(channel.peakDb) : "--") + " dBFS";
+  }
+  const parameters = audio?.parameters;
+  document.getElementById("audioNativeVolume").textContent = "YouTube volume: " + (audio?.volume == null ? "--" : audio.volume + "%");
+  const playback = { playing: "Playing", paused: "Paused", muted: "Muted", waiting: "Buffering", "no-video": "No video" };
+  const processing = { off: "Enhancement off", active: "Enhancement active", ready: "Waiting for playback", unsupported: "Native audio", error: "Processing unavailable" };
+  document.getElementById("audioMeterState").textContent = error ||
+    [processing[audio?.status], playback[audio?.playback]].filter(Boolean).join(" · ") || "Connecting...";
+  document.getElementById("audioMeterHint").textContent = error ? "Open a YouTube video, then return to Audio." :
+    audio?.channels ? "Fill: RMS · White mark / value: peak · Output after effects (dBFS)." :
+      audio?.status === "unsupported" ? "This video's native output cannot be metered safely." :
+        "Enable audio enhancement and play a video to measure its output.";
+  document.getElementById("audioAppliedBoost").textContent = parameters
+    ? `${parameters.volumeBoost}% (${dbText(20 * Math.log10(parameters.volumeBoost / 100))} dB)` : "--";
+  document.getElementById("audioAppliedBalance").textContent = !parameters ? "--" : parameters.audioBalance === 0 ? "Center" :
+    (parameters.audioBalance < 0 ? "Left " : "Right ") + Math.abs(parameters.audioBalance) + "%";
+  document.getElementById("audioAppliedEq").textContent = parameters
+    ? [parameters.bassGain, parameters.midGain, parameters.trebleGain].map(value => (value > 0 ? "+" : "") + value).join(" / ") + " dB" : "--";
+  document.getElementById("audioAppliedLimiter").textContent = !parameters ? "--" : parameters.audioLimiter
+    ? `On · Reduction ${Math.abs(audio.reductionDb).toFixed(1)} dB` : "Off";
+  if (audio) updateAudioStatus(audio.status);
+}
+
+function syncAudioMonitor() {
+  clearTimeout(audioMeterTimer);
+  const revision = ++audioMeterRevision;
+  if (!initialized || audioMeterClosed || activeTab !== "audio" || document.hidden) return;
+  renderAudioMonitor(null);
+  async function sample() {
+    try {
+      // Read only: sampling must never reapply configuration or restart the theme.
+      if (connectionPromise) await connectionPromise;
+      const tab = await getPreviewTab();
+      if (revision !== audioMeterRevision) return;
+      if (!tab?.id || !isYouTubeUrl(tab.url)) throw new Error("No YouTube video connected");
+      const response = await chrome.tabs.sendMessage(tab.id, { type: "YT_AUDIO_METER" }, { frameId: 0 });
+      if (response?.version !== SCRIPT_VERSION || !response.audio) throw new Error("Refresh YouTube to connect");
+      if (revision === audioMeterRevision) renderAudioMonitor(response.audio);
+    } catch {
+      if (revision === audioMeterRevision) renderAudioMonitor(null, "No YouTube video connected");
+    } finally {
+      if (revision === audioMeterRevision) audioMeterTimer = setTimeout(sample, 100);
+    }
+  }
+  void sample();
+}
+
+document.addEventListener("visibilitychange", syncAudioMonitor);
+
 window.addEventListener("pagehide", () => {
+  audioMeterClosed = true;
+  syncAudioMonitor();
   if (previewImageUrl) URL.revokeObjectURL(previewImageUrl);
 });
 
@@ -318,16 +456,40 @@ async function connectToCurrentTab() {
     throw new Error("Open YouTube to preview");
   }
   previewTabScope = pageScope(tab.url);
-  let response = await chrome.tabs.sendMessage(tab.id, { type: "YT_PROGRESS_PING" }).catch(() => null);
+  // A chat/embed frame can run another script generation. Its reply must not
+  // decide whether the main document needs to restart or has applied a preview.
+  const ping = () => chrome.tabs.sendMessage(tab.id, { type: "YT_PROGRESS_PING" }, { frameId: 0 }).catch(() => null);
+  let response = await ping();
+  if (!response) {
+    await new Promise(resolve => setTimeout(resolve, 80));
+    response = await ping();
+  }
   if (response?.version !== SCRIPT_VERSION) {
     await chrome.scripting.executeScript({
       target: { tabId: tab.id, allFrames: true },
-      files: ["settings.js", "content/surface-controller.js", "content/shorts-controller.js", "content/homepage-glass.js", "content/home-shorts-grid.js", "content/audio-controller.js", "content/music-theme.js", "yt.js"]
+      files: ["settings.js", "content/surface-controller.js", "content/shorts-controller.js", "content/homepage-glass.js", "content/home-shorts-grid.js", "content/audio-controller.js", "content/music-theme.js", "content/picture-in-picture.js", "yt.js"]
     });
-    response = await chrome.tabs.sendMessage(tab.id, { type: "YT_PROGRESS_PING" });
+    response = await ping();
   }
   if (response?.version !== SCRIPT_VERSION || !response.applied) throw new Error("Refresh YouTube and try again");
+  updateAudioStatus(response.audioStatus);
   return tab.id;
+}
+
+async function checkCurrentTabConnection() {
+  const attempt = connectToCurrentTab();
+  connectionPromise = attempt;
+  try {
+    await attempt;
+    if (connectionPromise !== attempt) return;
+    applicationError = "";
+    showStatus("Ready");
+  } catch (error) {
+    if (connectionPromise !== attempt) return;
+    connectionPromise = undefined;
+    applicationError = error.message === "Open YouTube to preview" ? error.message : "Refresh YouTube and try again";
+    showStatus(applicationError, true);
+  }
 }
 
 function applyToCurrentTab() {
@@ -348,7 +510,7 @@ async function flushLivePreview() {
       const message = { type: "YT_PROGRESS_LIVE_PREVIEW", settings: snapshot.settings, profiles: snapshot.profiles, assets: changedAssets };
       let response;
       try {
-        response = await chrome.tabs.sendMessage(tabId, message);
+        response = await chrome.tabs.sendMessage(tabId, message, { frameId: 0 });
         if (!response?.applied || response.version !== SCRIPT_VERSION) throw new Error("Reconnect");
       } catch {
         // A navigation can replace the content script while the popup stays open.
@@ -356,7 +518,7 @@ async function flushLivePreview() {
         connectionPromise = connectToCurrentTab();
         tabId = await connectionPromise;
         message.assets = snapshot.assets;
-        response = await chrome.tabs.sendMessage(tabId, message);
+        response = await chrome.tabs.sendMessage(tabId, message, { frameId: 0 });
       }
       if (response?.scope === "shared" || pageScopes.includes(response?.scope)) previewTabScope = response.scope;
       const expected = resolveSettings(snapshot.settings, snapshot.profiles, previewTabScope);
@@ -412,6 +574,7 @@ function settingsChanged(commit = false, profileEdit = false) {
 }
 
 function activateTab(tab, focus = false) {
+  settingsSearch.clear();
   activeTab = tab.id.slice(4);
   for (const item of tabs) {
     const selected = item === tab;
@@ -422,6 +585,8 @@ function activateTab(tab, focus = false) {
   document.querySelector(".tab-content").scrollTop = 0;
   document.getElementById("reset").disabled = activeTab === "backup";
   if (focus) tab.focus();
+  if (initialized && activeTab === "player") void updatePictureInPicture();
+  syncAudioMonitor();
 }
 
 tabs.forEach((tab, index) => {
@@ -679,7 +844,7 @@ document.getElementById("backupFile").addEventListener("change", async event => 
 
 const initializationPromise = (async () => {
   try {
-    const [, currentTab] = await Promise.all([loadStoredConfiguration(), getPreviewTab()]);
+    const [, currentTab] = await Promise.all([loadStoredConfiguration(), getPreviewTab(), localization.ready]);
     const activeScope = pageScope(currentTab?.url);
     if (pageProfiles[activeScope]?.enabled) editingScope = activeScope;
     const requestedScope = windowParameters.get("scope"), requestedPanel = windowParameters.get("panel");
@@ -689,7 +854,10 @@ const initializationPromise = (async () => {
     initialized = true;
     form.inert = false;
     openWindowButton.disabled = false;
-    applyToCurrentTab();
+    void updateShortcuts();
+    void checkCurrentTabConnection();
+    if (activeTab === "player") void updatePictureInPicture();
+    syncAudioMonitor();
   } catch {
     showStatus("Could not load settings. Reopen the extension.", true);
   }

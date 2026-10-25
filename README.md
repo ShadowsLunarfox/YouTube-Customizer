@@ -33,22 +33,26 @@
 
 ### ▶️ Player
 
+- In **Player → Picture-in-picture**, click **Open floating video** to open the current video in a native floating window. Click **Return video to tab** to close it. Both the toolbar menu and separate settings window support this action; wallpapers and thumbnail previews are excluded, and playback position, volume, and mute are preserved.
+- A Picture-in-picture icon also appears at the left edge of the player's right-hand controls, before CC/settings, so you can open or close the floating video without opening the extension menu. It follows the native controls in theater/fullscreen mode and returns when YouTube rebuilds its player controls.
 - Customize progress and buffered-segment colors, progress-bar thickness, and scrubber size.
 - Choose a separate color for the **Most replayed** heatmap, including its gradient and outline.
 - Choose a solid color, pulsing glow, moving shimmer, or cycling rainbow effect.
 - Pick a built-in scrubber shape or upload a custom image or GIF.
+- In **Player → Keyboard shortcuts**, see the browser's current bindings for opening the menu, toggling video picture-in-picture, and toggling audio enhancement. **Change shortcuts...** opens the browser's extension shortcut editor, where you can choose another combination or clear it to disable it. The suggested combinations are Alt+Shift+Y, Alt+Shift+P, and Alt+Shift+A; a combination that cannot be assigned is shown as **Not assigned**. Video/audio actions run only on YouTube and skip input fields, editors, and focused chat frames.
 
 ### Audio
 
 - Open the separate **Audio** tab to enable volume boost up to **500%**, adjust bass, midrange, treble, and stereo balance, and optionally reduce clipping. Audio processing starts off; disabling it restores normal audio. Wallpaper and thumbnail previews are excluded.
+- **Live audio** shows stereo RMS bars, peak levels in dBFS, YouTube volume, and the currently applied boost, EQ, balance, and limiter reduction. Sampling runs only while the Audio tab is visible and stops automatically after the menu closes. The meter uses the existing audio path; enable enhancement and play a supported video to start measuring. It does not measure the operating system's speaker volume.
 - **Reset tab** on Audio resets audio settings independently from Player and Appearance.
 
 ### 🧩 Layout and browsing
 
 - Set Home videos and Shorts to 2–6 items per row, with fewer columns on narrow windows. Disable hover previews or reduce motion.
 - Enable **Customize card layout** to adjust corner radius, border width, padding, gaps, section spacing, title lines, and equal row heights. Compact Music lists retain their native row height.
-- Home Premium image promotions share the rounded glass frame, inset artwork and text, and section spacing. Their content wraps on narrow windows.
-- Independently hide Home Playables, featured/membership videos and Premium promotions, topic recommendation shelves, and shopping recommendations. Hidden sections release their feed space.
+- Home Premium image and single-video promotions share the rounded glass frame, inset artwork and text, and section spacing. Their content wraps on narrow windows; video cards keep their own inset frame and usable menus.
+- At the top of **Layout → Home sections**, independently hide **single-video promotions** or **YouTube Playables games**. The all-featured/membership/Premium option includes single-video promotions; topic and shopping recommendations have their own switches. Hidden sections release their feed space. These choices are saved with the selected page configuration and work with the theme turned off.
 - Home Shorts initially show one row. Show more reveals the additional cards; changing the column setting collapses the shelf again.
 - Library pages use rounded panels and cards with the shared theme background, opacity, and blur: History, Playlists, Watch later, Liked videos, Downloads, Courses, and Clips.
 - Channel memberships has a themed header, wrapping topic filters, rounded video and creator cards, and clearly separated section headings. Creator names and prices appear below their artwork.
@@ -61,7 +65,10 @@
 - Use **Editing settings for** to edit shared settings or separate appearance and layout for **YouTube Home**, **Watch pages / Shorts**, and **YouTube Music**. Editing a page creates its override; turn off **Use separate appearance and layout** to return to shared settings. Player and Audio settings are shared.
 - Each page can have its own wallpaper. Page configurations and uploaded media are stored locally; shared settings continue to use browser sync storage.
 - Click **Open window** in the menu title bar to move the entire settings menu into a separate, resizable browser window. It keeps your selected settings tab and page configuration, previews on the originating YouTube tab, and remains open while you browse. Clicking Open window again reuses the existing window.
+- The title-bar language selector supports **Auto / 自动**, **中文**, and **English**. Auto follows the browser's interface language; the choice is stored locally and shared by the toolbar menu and independent windows. Labels, live audio readouts, status messages, and error hints switch immediately without reapplying the YouTube theme.
 - The **Backup** tab exports shared settings and all page configurations as JSON, with an option to include wallpapers and the custom icon. Import validates the file and replaces settings; a backup without media preserves existing media files. Backups support up to 150 MB.
+- Dropdown fields and their expanded lists use the Windows 98 palette, beveled borders, gray arrow buttons, and navy selection. They remain native select controls for keyboard and accessibility support.
+- The classic menu keeps its existing five tabs and control order. **Find** at the top searches settings in English or Chinese, including option names and aliases such as PiP, wallpaper, and Playables. Click a result to switch tabs, focus and highlight the setting. Search does not change values; disabled options lead to the related enable control. **Ctrl+F / Command+F** focuses search, arrow keys move through results, Enter selects, and Escape clears the query.
 
 ## 🚀 Installation
 
@@ -95,6 +102,8 @@ YouTube Customizer is a Manifest V3 extension for Chromium-based browsers, inclu
 
 After changing or updating the project files, open the browser's extensions page and click the extension's **Reload** button. Then refresh any open YouTube tabs.
 
+Opening or focusing the settings menu preserves the active theme and wallpaper. Settings are previewed when you edit them; content-script upgrades load the saved configuration before replacing the active instance.
+
 <details>
   <summary>🛠️ Frequently asked questions</summary>
 
@@ -120,6 +129,9 @@ After changing or updating the project files, open the browser's extensions page
 | `manifest.json` | Extension metadata, icons, permissions, and content-script configuration |
 | `settings.js` | Default settings, validation, and theme presets |
 | `popup.html`, `popup.css`, `popup.js` | Extension settings popup |
+| `i18n.js` | Chinese/English menu copy, local language preference, and dynamic text translation |
+| `settings-search.js` | Bilingual search and navigation through the existing settings form |
+| `service-worker.js` | Browser shortcut actions, typing guards, and brief action feedback |
 | `yt.js`, `content/` | YouTube page styling and feature controllers |
 | `content/home-shorts-grid.js` | Homepage Shorts columns; updates on shelf structure changes and detaches outside Home |
 | `content/audio-controller.js` | Player volume boost and equalizer; native Web Audio nodes with normal-audio bypass |

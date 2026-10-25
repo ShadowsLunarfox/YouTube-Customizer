@@ -12,9 +12,21 @@
       <header class="title-bar">
         <img class="app-icon" src="icons/icon-32.png" alt="" aria-hidden="true">
         <h1>YouTube Customizer</h1>
+        <select id="menuLanguage" aria-label="Menu language" title="Menu language"><option value="auto">Auto / 自动</option><option value="zh-CN">中文</option><option value="en">English</option></select>
         <button type="button" id="openWindow" title="Open the entire menu in a separate window" disabled>Open window</button>
       </header>
       <form id="settings-form" inert>
+        <div class="settings-search">
+          <label for="settingsSearch">Find:</label>
+          <input id="settingsSearch" type="search" placeholder="Search settings..." aria-label="Search settings" aria-controls="settingsSearchResults" autocomplete="off" spellcheck="false">
+          <button type="button" id="clearSettingsSearch" title="Clear search" aria-label="Clear search" hidden>×</button>
+          <span class="search-shortcut" aria-hidden="true">Ctrl+F</span>
+          <section id="settingsSearchResults" class="search-results" aria-label="Search results" hidden>
+            <p id="settingsSearchCount" role="status" aria-live="polite"></p>
+            <div id="settingsSearchList"></div>
+            <p id="settingsSearchEmpty" hidden>No matching settings. Try another keyword.</p>
+          </section>
+        </div>
         <div class="scope-controls">
           <label class="field"><span>Editing settings for</span><select id="editingScope"><option value="shared">All pages (shared)</option><option value="home">YouTube Home</option><option value="watch">Watch pages / Shorts</option><option value="music">YouTube Music</option></select></label>
           <label class="check-field" id="pageProfileRow" hidden><input type="checkbox" id="pageProfileEnabled"><span>Use separate appearance and layout</span></label>
@@ -57,6 +69,18 @@
 </div></fieldset>
           </section>
           <section id="player-panel" role="tabpanel" aria-labelledby="tab-player" tabindex="0" hidden>
+            <fieldset><legend>Keyboard shortcuts</legend><div class="field-list">
+<div class="field"><span>Open menu</span><output id="shortcutMenu" class="measurement">Not assigned</output></div>
+<div class="field"><span>Picture-in-picture</span><output id="shortcutPictureInPicture" class="measurement">Not assigned</output></div>
+<div class="field"><span>Audio enhancement</span><output id="shortcutAudio" class="measurement">Not assigned</output></div>
+<button type="button" id="configureShortcuts">Change shortcuts...</button>
+<p class="field-hint">Change or clear shortcuts in your browser's extension settings. Unassigned shortcuts may already be in use.</p>
+<p class="field-hint">Video and audio shortcuts work on YouTube and are ignored while typing in inputs or chat.</p>
+</div></fieldset>
+            <fieldset><legend>Picture-in-picture</legend><div class="field-list">
+<button type="button" id="pictureInPicture" aria-describedby="pictureInPictureStatus">Open floating video</button>
+<p class="field-hint" id="pictureInPictureStatus" role="status" aria-live="polite">Open the current video in a floating window. Click again to return it to its tab.</p>
+</div></fieldset>
             <fieldset class="preview-group">
               <legend>Preview</legend>
               <div class="preview"><div class="preview-track">
@@ -86,6 +110,19 @@
 </div></fieldset>
           </section>
           <section id="audio-panel" role="tabpanel" aria-labelledby="tab-audio" tabindex="0" hidden>
+            <fieldset class="audio-monitor"><legend>Live audio</legend>
+<div class="audio-monitor-heading"><strong id="audioMeterState" role="status">Connecting...</strong><span id="audioNativeVolume">YouTube volume: --</span></div>
+<div class="audio-meter-row"><span id="audioLeftLabel">L</span><div id="audioMeterLeft" class="audio-meter" role="meter" aria-labelledby="audioLeftLabel" aria-valuemin="-60" aria-valuemax="0" aria-valuenow="-60" aria-valuetext="Unavailable"><i class="audio-meter-fill"></i><i class="audio-meter-peak"></i></div><output id="audioLevelLeft">-- dBFS</output></div>
+<div class="audio-meter-row"><span id="audioRightLabel">R</span><div id="audioMeterRight" class="audio-meter" role="meter" aria-labelledby="audioRightLabel" aria-valuemin="-60" aria-valuemax="0" aria-valuenow="-60" aria-valuetext="Unavailable"><i class="audio-meter-fill"></i><i class="audio-meter-peak"></i></div><output id="audioLevelRight">-- dBFS</output></div>
+<div class="audio-meter-scale" aria-hidden="true"><span>-60</span><span>-30</span><span>0 dBFS</span></div>
+<p class="field-hint" id="audioMeterHint">Enable audio enhancement and play a video to measure its output.</p>
+<dl class="audio-parameters" aria-label="Current audio parameters">
+<div><dt>Applied boost</dt><dd id="audioAppliedBoost">--</dd></div>
+<div><dt>Balance</dt><dd id="audioAppliedBalance">--</dd></div>
+<div><dt>EQ: bass / mid / treble</dt><dd id="audioAppliedEq" title="Bass: 180 Hz · Mid: 1 kHz · Treble: 4 kHz">--</dd></div>
+<div><dt>Limiter</dt><dd id="audioAppliedLimiter">--</dd></div>
+</dl>
+            </fieldset>
             <fieldset><legend>Audio</legend><div class="field-list">
 <label class="check-field"><input type="checkbox" id="audioEnabled"><span>Enable volume boost and equalizer</span></label>
 <label class="field range-field"><span>Volume boost</span><input id="volumeBoost" type="range" min="100" max="500" step="10" value="100"><span class="measurement"><output id="volumeBoostValue" for="volumeBoost"></output><span>%</span></span></label>
@@ -100,6 +137,15 @@
 </div></fieldset>
           </section>
           <section id="layout-panel" role="tabpanel" aria-labelledby="tab-layout" tabindex="0" hidden>
+            <fieldset><legend>Home sections</legend><div class="field-list">
+<label class="check-field"><input type="checkbox" id="hideHomeSingleVideo"><span>Hide single-video promotions</span></label>
+<label class="check-field"><input type="checkbox" id="hideHomePlayables"><span>Hide YouTube Playables games</span></label>
+<label class="check-field"><input type="checkbox" id="hideHomeFeatured" aria-describedby="hideHomeFeaturedHint"><span>Hide all featured / membership / Premium promos</span></label>
+<p class="field-hint" id="hideHomeFeaturedHint">Includes single-video promotions.</p>
+<label class="check-field"><input type="checkbox" id="hideHomeTopicShelves"><span>Hide topic recommendation shelves</span></label>
+<label class="check-field"><input type="checkbox" id="hideHomeShopping"><span>Hide shopping recommendations</span></label>
+<p class="field-hint">Hidden sections also release their space in the Home feed.</p>
+</div></fieldset>
             <fieldset><legend>Card layout</legend><div class="field-list">
 <label class="check-field"><input type="checkbox" id="customizeCards"><span>Customize card layout</span></label>
 <label class="field range-field"><span>Corner radius</span><input id="cardRadius" type="range" min="0" max="32" value="16"><span class="measurement"><output id="cardRadiusValue" for="cardRadius"></output><span>px</span></span></label>
@@ -110,13 +156,6 @@
 <label class="field"><span>Title lines</span><select id="cardTitleLines"><option value="1">1 line</option><option value="2">2 lines</option><option value="3">3 lines</option><option value="4">4 lines</option></select></label>
 <label class="check-field"><input type="checkbox" id="equalCardHeights"><span>Keep cards in each row the same height</span></label>
 <p class="field-hint">Applies to video and music cards. Compact music lists keep their native row height.</p>
-</div></fieldset>
-            <fieldset><legend>Home sections</legend><div class="field-list">
-<label class="check-field"><input type="checkbox" id="hideHomePlayables"><span>Hide Playables</span></label>
-<label class="check-field"><input type="checkbox" id="hideHomeFeatured"><span>Hide featured / membership / Premium promos</span></label>
-<label class="check-field"><input type="checkbox" id="hideHomeTopicShelves"><span>Hide topic recommendation shelves</span></label>
-<label class="check-field"><input type="checkbox" id="hideHomeShopping"><span>Hide shopping recommendations</span></label>
-<p class="field-hint">Hidden sections also release their space in the Home feed.</p>
 </div></fieldset>
             <fieldset><legend>Video browsing</legend><div class="field-list">
 <label class="field"><span>Maximum videos per row</span><select id="videosPerRow"><option value="2">2 videos</option><option value="3">3 videos</option><option value="4">4 videos</option><option value="5">5 videos</option><option value="6">6 videos</option></select></label>
@@ -169,6 +208,9 @@
       <footer class="status-bar"><span id="status" role="status" aria-live="polite">Loading...</span></footer>
     </main>
     <script src="settings.js"></script>
+    <script src="i18n.js"></script>
+    <script src="content/picture-in-picture.js"></script>
+    <script src="settings-search.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>

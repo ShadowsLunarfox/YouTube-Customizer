@@ -63,7 +63,7 @@ const fixture=`<!doctype html><html><head><style>body{margin:20px;background:#33
     const settlePreview=async()=>{await popup.evaluate(()=>new Promise(resolve=>requestAnimationFrame(resolve)));await popup.waitForFunction(()=>!previewInFlight&&!pendingPreview);};
     await page.locator('#start').click();assert.equal((await state()).context,null,'default off does not allocate an audio context');
     await popup.reload();await popup.waitForSelector('#settings-form:not([inert])');await page.bringToFront();await popup.locator('#tab-audio').click();assert.equal(await popup.locator('#volumeBoost').isDisabled(),true);
-    assert.deepEqual(await popup.locator('[role=tab]').allTextContents(),['Appearance','Player','Audio','Layout']);
+    assert.deepEqual(await popup.locator('[role=tab]').allTextContents(),['Appearance','Player','Audio','Layout','Backup']);
     assert.equal(await popup.evaluate(()=>YTCustomizer.audioKeys.every(key=>document.getElementById(key).closest('[role=tabpanel]').id==='audio-panel')),true,'all audio controls live on their own page');
     await popup.evaluate(async()=>{const[tab]=await chrome.tabs.query({url:'https://www.youtube.com/watch?v=audio-fixture'});await chrome.scripting.executeScript({target:{tabId:tab.id},func:()=>{
       const create=AudioContext.prototype.createMediaElementSource;AudioContext.prototype.createMediaElementSource=function(...args){globalThis.__sourceCount=(globalThis.__sourceCount||0)+1;return create.apply(this,args);};

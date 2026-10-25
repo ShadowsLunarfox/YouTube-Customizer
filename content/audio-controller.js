@@ -152,6 +152,78 @@
     let listening = false;
     let contextListener = false;
     let problem = '';
+    let meter = null;
+    let meterTimer;
+
+    function stopMeter() {
+      clearTimeout(meterTimer);
+      if (!meter) return;
+      // Disconnect only the observation branch; the audible output stays intact.
+      try { meter.graph.output.disconnect(meter.splitter); } catch { /* Player removed. */ }
+      meter.splitter.disconnect();
+      meter = null;
+    }
+
+    function status() {
+      if (!settings?.audioEnabled || disposed) return 'off';
+      if (problem) return problem;
+      for (const graph of resources.connected) {
+        if (graph.route === 'processed' && !graph.video.paused && !graph.video.muted) return 'active';
+      }
+      return 'ready';
+    }
+
+    function measure() {
+      if (disposed) return null;
+      const videos = [...document.querySelectorAll(PLAYER_VIDEO_SELECTOR)].filter(isPlayerVideo);
+      const video = videos.find(item => !item.paused && !item.ended) || videos[0];
+      const graph = video && resources.graphs.get(video);
+      const processed = graph?.route === 'processed';
+      const parameters = Object.fromEntries(YTCustomizer.audioKeys.map(key => [key,
+        processed ? settings[key] : YTCustomizer.defaults[key]]));
+      parameters.audioEnabled = Boolean(processed);
+      parameters.audioLimiter = Boolean(processed && graph.limited);
+      const result = { status: status(), parameters,
+        playback: !video ? 'no-video' : video.muted || video.volume === 0 ? 'muted' :
+          video.paused || video.ended ? 'paused' : video.readyState < 3 ? 'waiting' : 'playing',
+        volume: video ? Math.round(video.volume * 100) : null,
+        channels: null, reductionDb: 0 };
+      // Never acquire a media source or resume a context just to draw a meter.
+      if (!graph?.output || graph.route === 'detached' || graph.context.state !== 'running') {
+        stopMeter();
+        return result;
+      }
+      if (meter?.graph !== graph) {
+        stopMeter();
+        try {
+          const splitter = graph.context.createChannelSplitter(2);
+          const analysers = [0, 1].map(channel => {
+            const analyser = graph.context.createAnalyser();
+            analyser.fftSize = 2048;
+            splitter.connect(analyser, channel);
+            return analyser;
+          });
+          // Analyser outputs may remain unconnected. This tap cannot duplicate sound.
+          graph.output.connect(splitter);
+          meter = { graph, splitter, analysers, samples: new Float32Array(2048) };
+        } catch { stopMeter(); return result; }
+      }
+      clearTimeout(meterTimer);
+      // Popup destruction is not guaranteed to deliver a final message. A lease
+      // also handles closed windows and multiple simultaneous settings views.
+      meterTimer = setTimeout(stopMeter, 1500);
+      const silent = result.playback !== 'playing';
+      const db = amplitude => amplitude > 1e-6 ? 20 * Math.log10(amplitude) : null;
+      result.channels = meter.analysers.map(analyser => {
+        if (silent) return { rmsDb: null, peakDb: null };
+        analyser.getFloatTimeDomainData(meter.samples);
+        let sum = 0, peak = 0;
+        for (const value of meter.samples) { sum += value * value; peak = Math.max(peak, Math.abs(value)); }
+        return { rmsDb: db(Math.sqrt(sum / meter.samples.length)), peakDb: db(peak) };
+      });
+      if (processed && graph.limited && !silent) result.reductionDb = graph.limiter.reduction;
+      return result;
+    }
 
     function attachListeners() {
       const needed = !disposed && (settings?.audioEnabled || resources.connected.size > 0);
@@ -268,20 +340,14 @@
     function dispose() {
       if (disposed) return;
       disposed = true;
+      stopMeter();
       resources.connected.forEach(bypass);
       attachListeners();
       // Closing a context cannot undo createMediaElementSource and would mute the video.
       // The unity-gain bypass keeps normal sound on disable/reinjection.
     }
 
-    return Object.freeze({ sync, refresh, dispose, get status() {
-      if (!settings?.audioEnabled || disposed) return 'off';
-      if (problem) return problem;
-      for (const graph of resources.connected) {
-        if (graph.route === 'processed' && !graph.video.paused && !graph.video.muted) return 'active';
-      }
-      return 'ready';
-    } });
+    return Object.freeze({ sync, refresh, dispose, measure, get status() { return status(); } });
   }
 
   runtime.createAudioController = createAudioController;

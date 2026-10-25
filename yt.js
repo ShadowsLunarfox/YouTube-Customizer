@@ -1,5 +1,5 @@
 // Applies saved appearance, player, and layout settings to YouTube pages.
-(() => {
+(async () => {
   const {
     version: SCRIPT_VERSION, defaults: DEFAULT_SETTINGS, assetDefaults,
     audioKeys, normalize, normalizeAssets, normalizeProfiles, normalizePageAssets, pageScope, resolveSettings, isSettingsPageUrl, iconDataUri
@@ -13,7 +13,34 @@
   const INSTANCE_KEY = "__ytProgressCustomizer";
   const previous = globalThis[INSTANCE_KEY];
   if (previous?.version === SCRIPT_VERSION && !previous.disposed) return;
-  previous?.dispose();
+  // Keep the current appearance while storage is loading. A menu-triggered
+  // upgrade must never paint the defaults between two content-script versions.
+  const loadToken = {};
+  runtime.contentLoadToken = loadToken;
+  let initialAssets, initialSettings, storageChanged;
+  const trackLoadingChanges = (changes, area) => {
+    if ((area === "sync" && Object.keys(DEFAULT_SETTINGS).some(key => key in changes)) ||
+        (area === "local" && [...Object.keys(assetDefaults), "pageProfiles", "pageAssets"].some(key => key in changes))) storageChanged = true;
+  };
+  chrome.storage.onChanged.addListener(trackLoadingChanges);
+  try {
+    do {
+      storageChanged = false;
+      [initialAssets, initialSettings] = await Promise.all([
+        chrome.storage.local.get({ ...assetDefaults, pageProfiles: {}, pageAssets: {} }),
+        chrome.storage.sync.get(DEFAULT_SETTINGS)
+      ]);
+    } while (storageChanged && runtime.contentLoadToken === loadToken);
+  } catch {
+    if (globalThis[INSTANCE_KEY] && !globalThis[INSTANCE_KEY].disposed) return;
+    initialAssets = { ...assetDefaults, pageProfiles: {}, pageAssets: {} };
+    initialSettings = DEFAULT_SETTINGS;
+  } finally { chrome.storage.onChanged.removeListener(trackLoadingChanges); }
+  if (runtime.contentLoadToken !== loadToken) return;
+  const active = globalThis[INSTANCE_KEY];
+  if (active?.version === SCRIPT_VERSION && !active.disposed) return;
+  const appearance = !active?.disposed ? active?.releaseAppearance?.() : null;
+  active?.dispose();
 
   let currentSettings = { ...DEFAULT_SETTINGS };
   let currentAssets = { ...assetDefaults };
@@ -23,17 +50,16 @@
   let pageAssets = {};
   let appliedScope = "";
   // Page-owned elements can reuse our ID; keep an owned node instead of adopting theirs.
-  let styleEl = null;
-  let stateRevision = 0;
+  let styleEl = appearance?.styleEl || null;
   let disposed = false;
   let stylesApplied = false;
   let sidebarTimer = 0;
-  let backgroundVideo = null;
-  let backgroundVideoData = "";
-  let backgroundVideoUrl = "";
-  let backgroundImageLayer = null;
-  let backgroundImageData = "";
-  let backgroundImageUrl = "";
+  let backgroundVideo = appearance?.backgroundVideo || null;
+  let backgroundVideoData = appearance?.backgroundVideoData || "";
+  let backgroundVideoUrl = appearance?.backgroundVideoUrl || "";
+  let backgroundImageLayer = appearance?.backgroundImageLayer || null;
+  let backgroundImageData = appearance?.backgroundImageData || "";
+  let backgroundImageUrl = appearance?.backgroundImageUrl || "";
 
   // Current recommendation cards mount their hover player in a portal outside the thumbnail.
   // Use the same scopes for hiding preview UI and stopping its media, including animated images.
@@ -110,6 +136,7 @@
 
   function removeBackgroundVideo() {
     if (backgroundVideo) {
+      backgroundVideo.removeEventListener("volumechange", silenceBackgroundVideo);
       backgroundVideo.pause();
       backgroundVideo.removeAttribute("src");
       backgroundVideo.load();
@@ -120,6 +147,15 @@
     backgroundVideoUrl = "";
     backgroundVideoData = "";
   }
+
+  function silenceBackgroundVideo() {
+    if (backgroundVideo) {
+      backgroundVideo.defaultMuted = true;
+      backgroundVideo.muted = true;
+      backgroundVideo.volume = 0;
+    }
+  }
+  if (backgroundVideo) backgroundVideo.addEventListener("volumechange", silenceBackgroundVideo);
 
   function syncBackgroundVideo() {
     const data = currentSettings.themeEnabled && currentSettings.backgroundMode === "image" &&
@@ -136,13 +172,7 @@
       backgroundVideo.loop = true;
       backgroundVideo.playsInline = true;
       backgroundVideo.setAttribute("aria-hidden", "true");
-      backgroundVideo.addEventListener("volumechange", () => {
-        if (backgroundVideo) {
-          backgroundVideo.defaultMuted = true;
-          backgroundVideo.muted = true;
-          backgroundVideo.volume = 0;
-        }
-      });
+      backgroundVideo.addEventListener("volumechange", silenceBackgroundVideo);
     }
     backgroundVideo.defaultMuted = true;
     backgroundVideo.muted = true;
@@ -655,6 +685,7 @@
     const hideHomeSection = type => hidden.push(home + ' ' + type,
       home + ' ytd-rich-section-renderer:has(' + type + ')');
     if (settings.hideHomePlayables) hideHomeSection(runtime.playablesShelfTypeSelector);
+    if (settings.hideHomeSingleVideo) hideHomeSection('ytd-brand-video-singleton-renderer');
     if (settings.hideHomeFeatured) {
       hideHomeSection('ytd-rich-shelf-renderer:not([is-shorts]):is([has-paygated-featured-badge], :has(#paygated-featured-badge:not([hidden]), .badge-style-type-members-only))');
       hideHomeSection('ytd-brand-video-shelf-renderer:not([has-sku-view-model], [has-movie-renderer])');
@@ -966,6 +997,7 @@
   const shorts = isMusic ? null : runtime.createShortsController(() => surfaces.scheduleUniversalGlass(true));
   const homeShortsGrid = isMusic ? null : runtime.createHomeShortsGridController();
   const audio = runtime.createAudioController();
+  const pipButtons = globalThis.YTCustomizerPictureInPicture?.createController();
 
   function applyConfiguration(settings = sharedSettings, assets = sharedAssets, profiles = pageProfiles, media = pageAssets) {
     sharedSettings = normalize(settings);
@@ -1036,22 +1068,13 @@
       syncSidebarSections();
       shorts.sync();
       homeShortsGrid.sync(currentSettings);
-      surfaces.apply();
+      surfaces.apply(!stylesApplied);
     }
     stylesApplied = true;
   }
 
-  async function loadSettings() {
-    const revision = stateRevision;
-    const [assets, settings] = await Promise.all([
-      chrome.storage.local.get({ ...assetDefaults, pageProfiles: {}, pageAssets: {} }), chrome.storage.sync.get(DEFAULT_SETTINGS)
-    ]);
-    if (disposed) return;
-    if (revision !== stateRevision) return loadSettings();
-    applyConfiguration(settings, assets, assets.pageProfiles, assets.pageAssets);
-  }
-
-  const ready = loadSettings().catch(() => applyStyles(currentSettings));
+  applyConfiguration(initialSettings, initialAssets, initialAssets.pageProfiles, initialAssets.pageAssets);
+  const ready = Promise.resolve();
 
   function stopPreviewVideo(video) {
     if (!currentSettings.disableVideoPreviews || !(video instanceof HTMLVideoElement) ||
@@ -1093,7 +1116,6 @@
 
   function onStorageChanged(changes, area) {
     if (area === "local" && [...Object.keys(assetDefaults), "pageProfiles", "pageAssets"].some(key => key in changes)) {
-      stateRevision++;
       let assets = sharedAssets;
       if (Object.keys(assetDefaults).some(key => key in changes)) {
         assets = { ...sharedAssets };
@@ -1102,7 +1124,6 @@
       applyConfiguration(sharedSettings, assets, changes.pageProfiles?.newValue ?? ("pageProfiles" in changes ? {} : pageProfiles),
         changes.pageAssets?.newValue ?? ("pageAssets" in changes ? {} : pageAssets));
     } else if (area === "sync" && Object.keys(DEFAULT_SETTINGS).some(key => key in changes)) {
-      stateRevision++;
       const settings = { ...sharedSettings };
       for (const key of Object.keys(DEFAULT_SETTINGS)) if (key in changes) settings[key] = changes[key].newValue;
       applyConfiguration(settings);
@@ -1111,15 +1132,18 @@
 
   function onMessage(message, sender, sendResponse) {
     if (disposed || sender?.id !== chrome.runtime.id || !isSettingsPageUrl(sender?.url, chrome.runtime.getURL("popup.html"))) return false;
-    if (message?.type !== "YT_PROGRESS_PING" && message?.type !== "YT_PROGRESS_LIVE_PREVIEW") return;
+    if (!["YT_PROGRESS_PING", "YT_PROGRESS_LIVE_PREVIEW", "YT_AUDIO_METER"].includes(message?.type)) return;
     if (message.type === "YT_PROGRESS_LIVE_PREVIEW" &&
         (!message.settings || typeof message.settings !== "object" || Array.isArray(message.settings) ||
           message.assets !== undefined && (!message.assets || typeof message.assets !== "object" || Array.isArray(message.assets)) ||
           message.profiles !== undefined && (!message.profiles || typeof message.profiles !== "object" || Array.isArray(message.profiles)))) return false;
     ready.then(() => {
       if (disposed) { sendResponse({ version: SCRIPT_VERSION, applied: false }); return; }
+      if (message.type === "YT_AUDIO_METER") {
+        sendResponse({ version: SCRIPT_VERSION, audio: audio.measure() });
+        return;
+      }
       if (message.type === "YT_PROGRESS_LIVE_PREVIEW") {
-        stateRevision++;
         let assets = sharedAssets;
         if (Object.keys(assetDefaults).some(key => message.assets && Object.hasOwn(message.assets, key) && message.assets[key] !== sharedAssets[key])) {
           assets = { ...sharedAssets };
@@ -1148,6 +1172,7 @@
     if (!styleEl?.isConnected) applyStyles(currentSettings);
     if (backgroundImageLayer && !backgroundImageLayer.isConnected) syncBackgroundImage();
     if (backgroundVideo && !backgroundVideo.isConnected) syncBackgroundVideo();
+    pipButtons?.handleMutations(records);
     if (isMusic) return;
     if (records.some(record => {
       if (record.type !== "childList") return false;
@@ -1190,6 +1215,14 @@
   globalThis[INSTANCE_KEY] = {
     version: SCRIPT_VERSION,
     get disposed() { return disposed; },
+    releaseAppearance() {
+      const appearance = { styleEl, backgroundVideo, backgroundVideoData, backgroundVideoUrl,
+        backgroundImageLayer, backgroundImageData, backgroundImageUrl };
+      backgroundVideo?.removeEventListener("volumechange", silenceBackgroundVideo);
+      styleEl = backgroundVideo = backgroundImageLayer = null;
+      backgroundVideoData = backgroundVideoUrl = backgroundImageData = backgroundImageUrl = "";
+      return appearance;
+    },
     dispose() {
       disposed = true;
       observer.disconnect();
@@ -1197,6 +1230,7 @@
       shorts?.dispose();
       homeShortsGrid?.dispose();
       audio.dispose();
+      pipButtons?.dispose();
       surfaces?.dispose();
       if (!isMusic) {
         shortsEvents.forEach(event => document.removeEventListener(event, shorts.sync, true));

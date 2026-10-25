@@ -67,7 +67,11 @@
   const BRAND_VIDEO_CARD_SELECTOR = BRAND_VIDEO_SHELF_SELECTOR +
     ' :is(#visible-video-container, #hidden-video-container) > :is(ytd-rich-grid-media, yt-lockup-view-model)';
   runtime.brandVideoShelfSelector = BRAND_VIDEO_SHELF_SELECTOR;
-  const HOME_PROMO_TYPE_SELECTOR = 'ytd-statement-banner-renderer';
+  const SINGLETON_PROMO_SELECTOR = 'ytd-browse[page-subtype="home"] ytd-brand-video-singleton-renderer';
+  const SINGLETON_PROMO_CARD_SELECTOR = SINGLETON_PROMO_SELECTOR +
+    ' :is(#thumbnail-container, #metadata-video-container) > :is(ytd-rich-grid-media, yt-lockup-view-model)';
+  runtime.singletonPromoSelector = SINGLETON_PROMO_SELECTOR;
+  const HOME_PROMO_TYPE_SELECTOR = ':is(ytd-statement-banner-renderer, ytd-brand-video-singleton-renderer)';
   const HOME_PROMO_SELECTOR = 'ytd-browse[page-subtype="home"] ' + HOME_PROMO_TYPE_SELECTOR;
   runtime.homePromoTypeSelector = HOME_PROMO_TYPE_SELECTOR;
   runtime.homePromoSelector = HOME_PROMO_SELECTOR;
@@ -152,7 +156,7 @@
     TOPICS_SHELF_SELECTOR, TOPICS_SHELF_SELECTOR + " button",
     MEMBERSHIPS_SHELF_SELECTOR + " button",
     BRAND_VIDEO_SHELF_SELECTOR, BRAND_VIDEO_CARD_SELECTOR,
-    HOME_PROMO_SELECTOR, HOME_PROMO_SELECTOR + ' button',
+    HOME_PROMO_SELECTOR, SINGLETON_PROMO_CARD_SELECTOR, HOME_PROMO_SELECTOR + ' button',
     PLAYABLES_SHELF_SELECTOR + ' ' + PLAYABLES_CARD_TYPES,
     MEMBERSHIPS_PAGE_HERO_SELECTOR, MEMBERSHIPS_PAGE_CARD_SELECTOR, MEMBERSHIPS_PAGE_TITLE_SELECTOR,
     SEARCH_SHORTS_SHELF_SELECTOR, SEARCH_SHORTS_CARD_SELECTOR,
@@ -198,7 +202,10 @@
       '#show-more-button-container, #bottom-button-container)',
     HOME_PROMO_SELECTOR + ' :is(#dismissible, #statement-banner-content, #background-content, ' +
       '#foreground-content, #details-container, #text-container, #badge-view-model-container, ' +
-      '#button-container, #button-wrapper)',
+      '#button-container, #button-wrapper, #content-wrapper, #thumbnail-container, #metadata-container, ' +
+      '#metadata-text-container, #metadata-video-container, #featured-badge-container, #title-container)',
+    SINGLETON_PROMO_CARD_SELECTOR + ' :is(#details, #meta, .ytLockupViewModelHost, ' +
+      '.ytLockupMetadataViewModelHost, .ytLockupMetadataViewModelTextContainer)',
     PLAYABLES_SHELF_SELECTOR + ' :is(#dismissible, #rich-shelf-header-container, ' +
       '#rich-shelf-header, #contents-container, #contents, .button-container)',
     MEMBERSHIPS_PAGE_CLEAR_SELECTOR,
@@ -285,6 +292,7 @@
     ${MEMBERSHIPS_SHELF_SELECTOR} :is(ytd-rich-item-renderer, yt-lockup-view-model, button),
     ${BRAND_VIDEO_CARD_SELECTOR},
     ${BRAND_VIDEO_SHELF_SELECTOR} button,
+    ${SINGLETON_PROMO_CARD_SELECTOR},
     ${HOME_PROMO_SELECTOR} button,
     ${PLAYABLES_SHELF_SELECTOR} :is(${PLAYABLES_CARD_TYPES}, button),
     ytd-guide-renderer #footer,
@@ -612,7 +620,7 @@
       }, 0);
     }
 
-    function apply() {
+    function apply(synchronous = false) {
       const feed = location.pathname.match(/^\/feed\/(history|playlists|downloads|courses|clips)\/?$/)?.[1];
       const list = location.pathname === '/playlist' ? new URLSearchParams(location.search).get('list') : null;
       const library = feed || (list === 'WL' ? 'watch-later' : list === 'LL' ? 'liked' : '');
@@ -620,7 +628,11 @@
       else document.documentElement.removeAttribute(LIBRARY_ATTR);
       syncHomepageState();
       syncAmbientBlocker(true);
-      scheduleUniversalGlass(true);
+      if (synchronous === true) {
+        clearTimeout(glassTimer);
+        fullGlassScanPending = true;
+        syncUniversalGlass();
+      } else scheduleUniversalGlass(true);
       scheduleLiveChatSurfaces();
     }
 

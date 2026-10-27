@@ -6,6 +6,10 @@
     const list = document.getElementById('settingsSearchList'), count = document.getElementById('settingsSearchCount');
     const empty = document.getElementById('settingsSearchEmpty');
     const aliases = {
+      showVideoBookmarks:'bookmarks timestamp notes markers save points sticky timeline 收藏 记录点 标记 时间点 笔记 备注 跳转 小纸条 进度条',
+      bookmarkStats:'timeline records bookmarks statistics count notes 进度条 播放条 记录点 标记 小纸条 笔记 统计 总数 数量',
+      menuTheme:'menu theme system dark light mode night 深色 浅色 夜间 黑暗 亮色 主题 模式 系统',
+      useDefaultShortcuts:'keyboard default shortcuts hotkeys 快捷键 默认 按键 热键',
       menuLanguage:'languages chinese english 中文 英文 语言', editingScope:'profile shared page configuration 全局 共用 独立 页面 配置',
       pageProfileEnabled:'profile override 独立配置 分页', pictureInPicture:'pip floating video 画中画 浮窗 小窗',
       configureShortcuts:'keyboard hotkey shortcut 快捷键 热键', uploadBackground:'wallpaper image video gif mp4 upload 壁纸 背景 图片 动图 上传',
@@ -36,11 +40,12 @@
       add(row.querySelector('input:not([type="file"]),select,button,output'),row.querySelector(':scope > span')?.textContent.trim(),row);
     });
     document.querySelectorAll('[role="tabpanel"] .field-list > button').forEach(button => add(button,button.textContent.trim()));
-    for (const id of ['menuLanguage','editingScope','pageProfileEnabled']) {
+    for (const id of ['menuTheme','menuLanguage','editingScope','pageProfileEnabled']) {
       const control = document.getElementById(id), row = control.closest('label') || control;
       add(control,control.getAttribute('aria-label') || row.querySelector('span')?.textContent.trim(),row);
     }
     const meter = document.querySelector('.audio-monitor'); meter.id = 'audioMonitor'; add(meter,'Live audio');
+    const bookmarkStats = document.getElementById('bookmarkStats'); add(bookmarkStats, 'Timeline record statistics');
     let highlighted = null, highlightTimer;
     function dismiss() { results.hidden = true; }
     function clearSearch({ focus = false } = {}) {

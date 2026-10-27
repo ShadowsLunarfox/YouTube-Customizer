@@ -61,7 +61,7 @@ async function checkSize(page,width,height) {
     assert.equal(new URL(detached.url()).searchParams.get('target'),String(original.id));
     for(const[width,height]of [[520,760],[900,900],[360,640]]){
       await checkSize(detached,width,height);
-      for(const tab of ['appearance','player','audio','layout','backup']){
+      for(const tab of ['appearance','player','records','shortcuts','audio','layout','backup']){
         await button(detached,'tab-'+tab);await checkSize(detached,width,height);
       }
       if(process.env.YTC_SCREENSHOTS)await detached.screenshot({path:path.join(os.tmpdir(),`ytc-settings-window-${width}.png`)});

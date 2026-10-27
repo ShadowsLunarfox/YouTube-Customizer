@@ -10,14 +10,18 @@
   <body>
     <main class="panel">
       <header class="title-bar">
-        <img class="app-icon" src="icons/icon-32.png" alt="" aria-hidden="true">
-        <h1>YouTube Customizer</h1>
+        <div class="app-brand"><img class="app-icon" src="icons/icon-128.png" alt="" aria-hidden="true"><div class="brand-copy"><h1>YouTube Customizer</h1><p>Make YouTube yours.</p></div></div>
+        <div class="header-actions">
+        <select id="menuTheme" aria-label="Menu theme" title="Menu theme"><option value="auto">System theme</option><option value="light">Light mode</option><option value="dark">Dark mode</option></select>
         <select id="menuLanguage" aria-label="Menu language" title="Menu language"><option value="auto">Auto / 自动</option><option value="zh-CN">中文</option><option value="en">English</option></select>
-        <button type="button" id="openWindow" title="Open the entire menu in a separate window" disabled>Open window</button>
+        <button type="button" id="openWindow" title="Open the entire menu in a separate window" disabled><svg aria-hidden="true"><use href="icons/ui.svg#window"></use></svg><span>Open window</span></button>
+        <button type="button" id="closeInPage" title="Close" aria-label="Close" hidden>×</button>
+        </div>
       </header>
       <form id="settings-form" inert>
         <div class="settings-search">
           <label for="settingsSearch">Find:</label>
+          <svg class="search-icon" aria-hidden="true"><use href="icons/ui.svg#search"></use></svg>
           <input id="settingsSearch" type="search" placeholder="Search settings..." aria-label="Search settings" aria-controls="settingsSearchResults" autocomplete="off" spellcheck="false">
           <button type="button" id="clearSettingsSearch" title="Clear search" aria-label="Clear search" hidden>×</button>
           <span class="search-shortcut" aria-hidden="true">Ctrl+F</span>
@@ -33,11 +37,13 @@
           <p class="field-hint" id="scopeHint">Pages without separate settings use the shared configuration.</p>
         </div>
         <div class="tabs" role="tablist" aria-label="Settings">
-          <button type="button" role="tab" id="tab-appearance" aria-controls="appearance-panel" aria-selected="true">Appearance</button>
-          <button type="button" role="tab" id="tab-player" aria-controls="player-panel" aria-selected="false" tabindex="-1">Player</button>
-          <button type="button" role="tab" id="tab-audio" aria-controls="audio-panel" aria-selected="false" tabindex="-1">Audio</button>
-          <button type="button" role="tab" id="tab-layout" aria-controls="layout-panel" aria-selected="false" tabindex="-1">Layout</button>
-          <button type="button" role="tab" id="tab-backup" aria-controls="backup-panel" aria-selected="false" tabindex="-1">Backup</button>
+          <button type="button" role="tab" id="tab-appearance" aria-controls="appearance-panel" aria-selected="true"><svg aria-hidden="true"><use href="icons/ui.svg#appearance"></use></svg>Appearance</button>
+          <button type="button" role="tab" id="tab-player" aria-controls="player-panel" aria-selected="false" tabindex="-1"><svg aria-hidden="true"><use href="icons/ui.svg#player"></use></svg>Player</button>
+          <button type="button" role="tab" id="tab-records" aria-controls="records-panel" aria-selected="false" tabindex="-1"><svg aria-hidden="true"><use href="icons/ui.svg#records"></use></svg>Records</button>
+          <button type="button" role="tab" id="tab-shortcuts" aria-controls="shortcuts-panel" aria-selected="false" tabindex="-1"><svg aria-hidden="true"><use href="icons/ui.svg#shortcuts"></use></svg>Shortcuts</button>
+          <button type="button" role="tab" id="tab-audio" aria-controls="audio-panel" aria-selected="false" tabindex="-1"><svg aria-hidden="true"><use href="icons/ui.svg#audio"></use></svg>Audio</button>
+          <button type="button" role="tab" id="tab-layout" aria-controls="layout-panel" aria-selected="false" tabindex="-1"><svg aria-hidden="true"><use href="icons/ui.svg#layout"></use></svg>Layout</button>
+          <button type="button" role="tab" id="tab-backup" aria-controls="backup-panel" aria-selected="false" tabindex="-1"><svg aria-hidden="true"><use href="icons/ui.svg#backup"></use></svg>Backup</button>
         </div>
         <div class="tab-content">
           <section id="appearance-panel" role="tabpanel" aria-labelledby="tab-appearance" tabindex="0">
@@ -68,15 +74,35 @@
 <label class="field range-field"><span>Background opacity</span><input id="backgroundOpacity" type="range" min="0" max="100" value="40"><span class="measurement"><output id="backgroundOpacityValue" for="backgroundOpacity"></output><span>%</span></span></label>
 </div></fieldset>
           </section>
-          <section id="player-panel" role="tabpanel" aria-labelledby="tab-player" tabindex="0" hidden>
-            <fieldset><legend>Keyboard shortcuts</legend><div class="field-list">
-<div class="field"><span>Open menu</span><output id="shortcutMenu" class="measurement">Not assigned</output></div>
-<div class="field"><span>Picture-in-picture</span><output id="shortcutPictureInPicture" class="measurement">Not assigned</output></div>
-<div class="field"><span>Audio enhancement</span><output id="shortcutAudio" class="measurement">Not assigned</output></div>
-<button type="button" id="configureShortcuts">Change shortcuts...</button>
-<p class="field-hint">Change or clear shortcuts in your browser's extension settings. Unassigned shortcuts may already be in use.</p>
-<p class="field-hint">Video and audio shortcuts work on YouTube and are ignored while typing in inputs or chat.</p>
+          <section id="records-panel" role="tabpanel" aria-labelledby="tab-records" tabindex="0" hidden>
+            <fieldset><legend>Video bookmarks</legend><div class="field-list">
+<label class="check-field"><input type="checkbox" id="showVideoBookmarks"><span>Show video bookmarks</span></label>
+<p class="field-hint">Click above the video timeline to pin a timestamp and write a sticky note. Click a pin to read or edit it.</p>
 </div></fieldset>
+            <fieldset id="bookmarkStats" tabindex="-1" aria-busy="false"><legend>Timeline record statistics</legend>
+<dl class="bookmark-stats-totals" aria-live="polite">
+<div><dt>Recorded videos</dt><dd id="bookmarkStatsVideos">--</dd></div>
+<div><dt>Timeline points</dt><dd id="bookmarkStatsPoints">--</dd></div>
+<div><dt>Sticky notes</dt><dd id="bookmarkStatsNotes">--</dd></div>
+</dl>
+<p class="field-hint">Local totals across all videos. Notes count records with non-empty text.</p>
+<div class="bookmark-stats-current"><strong>Current video</strong><p id="bookmarkStatsCurrentVideo" translate="no" hidden></p><p id="bookmarkStatsCurrentCount" class="field-hint">Open a video to see its saved records.</p></div>
+<div class="bookmark-stats-controls"><button type="button" id="toggleBookmarkStatsRecords" aria-expanded="false" aria-controls="bookmarkStatsList" hidden>Show records</button><button type="button" id="refreshBookmarkStats">Refresh statistics</button></div>
+<ol id="bookmarkStatsList" class="bookmark-stats-list" hidden></ol><p id="bookmarkStatsStatus" class="field-hint" role="status" aria-live="polite"></p>
+</fieldset>
+          </section>
+          <section id="shortcuts-panel" role="tabpanel" aria-labelledby="tab-shortcuts" tabindex="0" hidden>
+            <fieldset class="shortcuts-group"><legend>Keyboard shortcuts</legend><div class="field-list">
+<div class="shortcut-row"><span>Open menu</span><div class="shortcut-binding"><output id="shortcutMenu" class="shortcut-value" data-state="unassigned">Not assigned</output><small class="shortcut-source" hidden>YouTube default</small></div></div>
+<div class="shortcut-row"><span>Picture-in-picture</span><div class="shortcut-binding"><output id="shortcutPictureInPicture" class="shortcut-value" data-state="unassigned">Not assigned</output><small class="shortcut-source" hidden>YouTube default</small></div></div>
+<div class="shortcut-row"><span>Audio enhancement</span><div class="shortcut-binding"><output id="shortcutAudio" class="shortcut-value" data-state="unassigned">Not assigned</output><small class="shortcut-source" hidden>YouTube default</small></div></div>
+<label class="check-field"><input type="checkbox" id="useDefaultShortcuts"><span>Use default shortcuts on YouTube</span></label>
+<button type="button" id="configureShortcuts"><span>Change shortcuts...</span><svg aria-hidden="true"><use href="icons/ui.svg#window"></use></svg></button>
+<p class="field-hint">Browser bindings take priority. Enable defaults to use the shown keys on YouTube when unassigned.</p>
+<p class="field-hint">Video and audio shortcuts only run on YouTube, outside text fields and chat.</p>
+</div></fieldset>
+          </section>
+          <section id="player-panel" role="tabpanel" aria-labelledby="tab-player" tabindex="0" hidden>
             <fieldset><legend>Picture-in-picture</legend><div class="field-list">
 <button type="button" id="pictureInPicture" aria-describedby="pictureInPictureStatus">Open floating video</button>
 <p class="field-hint" id="pictureInPictureStatus" role="status" aria-live="polite">Open the current video in a floating window. Click again to return it to its tab.</p>
@@ -209,7 +235,10 @@
     </main>
     <script src="settings.js"></script>
     <script src="i18n.js"></script>
+    <script src="menu-theme.js"></script>
     <script src="content/picture-in-picture.js"></script>
+    <script src="content/video-bookmarks.js"></script>
+    <script src="popup-bookmark-stats.js"></script>
     <script src="settings-search.js"></script>
     <script src="popup.js"></script>
   </body>

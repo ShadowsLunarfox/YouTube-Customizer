@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "YouTube Customizer",
   "description": "Personalize YouTube backgrounds, colors, progress icons, and page layout.",
-  "version": "2.10.1",
+  "version": "2.13.6",
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",
@@ -24,7 +24,7 @@
   },
   "host_permissions": ["https://*.youtube.com/*"],
   "content_security_policy": {
-    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none';"
+    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self' https://youtube.com https://*.youtube.com;"
   },
   "action": {
     "default_title": "YouTube Customizer",
@@ -32,14 +32,16 @@
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png",
       "48": "icons/icon-48.png"
-    },
-    "default_popup": "popup.html"
+    }
   },
+  "web_accessible_resources": [{ "resources": ["popup.html", "icons/icon-32.png"], "matches": ["https://*.youtube.com/*"] }],
   "content_scripts": [
     {
       "matches": ["https://*.youtube.com/*"],
       "js": [
         "settings.js",
+        "i18n.js",
+        "menu-theme.js",
         "content/surface-controller.js",
         "content/shorts-controller.js",
         "content/homepage-glass.js",
@@ -47,6 +49,9 @@
         "content/audio-controller.js",
         "content/music-theme.js",
         "content/picture-in-picture.js",
+        "content/in-page-settings.js",
+        "content/video-bookmarks.js",
+        "content/default-shortcuts.js",
         "yt.js"
       ],
       "all_frames": true,

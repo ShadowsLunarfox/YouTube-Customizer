@@ -1,4 +1,4 @@
-// Preserve the classic menu while checking a real customized select picker and bilingual settings search.
+// Exercise the modern menu, native customized select picker and bilingual settings search.
 const assert=require('node:assert/strict');
 const path=require('node:path');
 const os=require('node:os');
@@ -19,9 +19,11 @@ const fixture='<!doctype html><style>body{margin:0;color:white;background:#333}y
   const tab=await control.evaluate(async()=>{const[tab]=await chrome.tabs.query({url:'https://www.youtube.com/'});return tab});
   const menu=await context.newPage();await menu.goto(`chrome-extension://${id}/popup.html?window=1&target=${tab.id}`);await menu.waitForSelector('#settings-form:not([inert])');
   await menu.setViewportSize({width:480,height:760});
-  assert.deepEqual(await menu.locator('[role=tab]').allTextContents(),['Appearance','Player','Audio','Layout','Backup']);
+  assert.deepEqual(await menu.locator('[role=tab]').allTextContents(),['Appearance','Player','Records','Shortcuts','Audio','Layout','Backup']);
   assert.equal(await menu.locator('#appearance-panel > .theme-preview').count(),1,'the existing layout and preview are preserved');
-  assert.equal(await menu.locator('details').count(),0,'no accordion redesign is introduced');
+  assert.equal(await menu.locator('.app-icon').evaluate(async img=>{await img.decode();return img.naturalWidth}),128,'the new vector-derived icon renders');
+  assert.equal(await menu.locator('.tabs svg use').count(),7,'each category has a matching line icon');
+  assert.equal(await menu.locator('details').count(),0,'all settings remain directly accessible');
   assert.equal(await menu.locator('#reset').isVisible(),true);assert.equal(await menu.locator('#resetAll').isVisible(),true);
   assert.equal(await menu.evaluate(()=>Object.keys(fields).every(id=>settingsSearch.entries.some(entry=>entry.control.id===id))),true,'all saved settings are searchable');
   assert.equal(await menu.locator('#themePreset').evaluate(select=>getComputedStyle(select).appearance),'base-select');
@@ -33,11 +35,11 @@ const fixture='<!doctype html><style>body{margin:0;color:white;background:#333}y
    selected:getComputedStyle(select.selectedOptions[0]).backgroundColor,
    selectedText:getComputedStyle(select.selectedOptions[0]).color
   }));
-  assert.equal(picker.border,'0px');assert.notEqual(picker.shadow,'none');assert.equal(picker.arrow,'rgb(192, 192, 192)');
-  assert.equal(picker.selected,'rgb(0, 0, 128)');assert.equal(picker.selectedText,'rgb(255, 255, 255)');
-  if(process.env.YTC_SCREENSHOTS)await menu.screenshot({path:path.join(os.tmpdir(),'ytc-classic-dropdown.png')});
+  assert.ok(parseFloat(picker.border)>0);assert.notEqual(picker.shadow,'none');assert.equal(picker.arrow,'rgba(0, 0, 0, 0)');
+  assert.equal(picker.selected,'rgb(255, 240, 243)');assert.equal(picker.selectedText,'rgb(173, 32, 66)');
+  if(process.env.YTC_SCREENSHOTS)await menu.screenshot({path:path.join(os.tmpdir(),'ytc-modern-dropdown.png')});
   await menu.locator('#themePreset option[value="forest"]').hover();
-  assert.equal(await menu.locator('#themePreset option[value="forest"]').evaluate(option=>getComputedStyle(option).backgroundColor),'rgb(0, 0, 128)');
+  assert.equal(await menu.locator('#themePreset option[value="forest"]').evaluate(option=>getComputedStyle(option).backgroundColor),'rgb(255, 240, 243)');
   assert.equal(await menu.locator('#themePreset option[value="custom"]').evaluate(option=>getComputedStyle(option).backgroundColor),'rgb(255, 255, 255)','hover highlights only one row');
   await menu.locator('#themePreset option[value="forest"]').click();await menu.waitForFunction(()=>document.querySelector('#pageColor').value==='#13211b');
   await menu.waitForFunction(()=>!previewInFlight&&!pendingPreview&&saveTimer===undefined);
@@ -57,7 +59,7 @@ const fixture='<!doctype html><style>body{margin:0;color:white;background:#333}y
   await find('平铺','backgroundFit');await menu.locator('[data-setting-id="backgroundFit"]').click();assert.equal(await menu.locator('#backgroundFit').isVisible(),true);
   await find('bass','bassGain');await menu.locator('[data-setting-id="bassGain"]').click();assert.equal(await menu.locator('#tab-audio').getAttribute('aria-selected'),'true');assert.equal(await menu.locator('#audioEnabled').evaluate(el=>el===document.activeElement),true);assert.equal(await menu.locator('#bassGain').isDisabled(),true);
   await find('音量条','audioMonitor');await menu.locator('[data-setting-id="audioMonitor"]').click();assert.equal(await menu.locator('.audio-monitor').isVisible(),true);
-  await find('快捷键','configureShortcuts');await menu.locator('[data-setting-id="configureShortcuts"]').click();assert.equal(await menu.locator('#tab-player').getAttribute('aria-selected'),'true');assert.equal(await menu.locator('#configureShortcuts').isVisible(),true);
+  await find('快捷键','configureShortcuts');await menu.locator('[data-setting-id="configureShortcuts"]').click();assert.equal(await menu.locator('#tab-shortcuts').getAttribute('aria-selected'),'true');assert.equal(await menu.locator('#configureShortcuts').isVisible(),true);
   await find('画中画','pictureInPicture');assert.equal(await menu.locator('.search-result').first().getAttribute('data-setting-id'),'pictureInPicture','the video action ranks ahead of shortcut readouts');
   await find('声音增强','audioEnabled');assert.equal(await menu.locator('.search-result').first().getAttribute('data-setting-id'),'audioEnabled');
   await find('Playables','hideHomePlayables');await menu.locator('[data-setting-id="hideHomePlayables"]').click();assert.equal(await menu.locator('#tab-layout').getAttribute('aria-selected'),'true');assert.equal(await menu.locator('#hideHomePlayables').isVisible(),true);
@@ -72,17 +74,19 @@ const fixture='<!doctype html><style>body{margin:0;color:white;background:#333}y
   await find('透明','uiOpacity');await menu.waitForFunction(()=>document.querySelector('#settingsSearchCount').textContent.includes('找到'));assert.equal(await menu.locator('[data-setting-id="uiOpacity"] strong').textContent(),'界面不透明度');
   for(const width of [360,480,900]){
    await menu.setViewportSize({width,height:760});
+   assert.equal(await menu.locator('.tabs').getAttribute('aria-orientation'),'horizontal');
    assert.equal(await menu.evaluate(()=>document.documentElement.scrollWidth<=innerWidth&&document.querySelector('.search-results').scrollWidth<=document.querySelector('.search-results').clientWidth),true);
-   if(process.env.YTC_SCREENSHOTS)await menu.screenshot({path:path.join(os.tmpdir(),`ytc-classic-search-${width}.png`)});
+   if(process.env.YTC_SCREENSHOTS)await menu.screenshot({path:path.join(os.tmpdir(),`ytc-modern-search-${width}.png`)});
    await menu.locator('#clearSettingsSearch').click();
-   for(const panel of ['appearance','player','audio','layout','backup']){await menu.locator('#tab-'+panel).click();assert.equal(await menu.evaluate(()=>document.querySelector('.tab-content').scrollWidth<=document.querySelector('.tab-content').clientWidth),true);}
+   for(const panel of ['appearance','player','records','shortcuts','audio','layout','backup']){await menu.locator('#tab-'+panel).click();assert.equal(await menu.evaluate(()=>document.querySelector('.tab-content').scrollWidth<=document.querySelector('.tab-content').clientWidth),true);}
    await find('透明','uiOpacity');
   }
-  await menu.locator('#clearSettingsSearch').click();await menu.locator('#tab-layout').click();await menu.locator('#hideHomeSingleVideo').check();
+  await menu.locator('#clearSettingsSearch').click();await menu.locator('#tab-appearance').focus();await menu.keyboard.press('ArrowDown');assert.equal(await menu.locator('#tab-player').getAttribute('aria-selected'),'true');await menu.keyboard.press('Home');assert.equal(await menu.locator('#tab-appearance').getAttribute('aria-selected'),'true');
+  await menu.locator('#tab-layout').click();await menu.locator('#hideHomeSingleVideo').check();
   await menu.waitForFunction(async()=>(await chrome.storage.sync.get('hideHomeSingleVideo')).hideHomeSingleVideo===true);
   await menu.reload();await menu.waitForSelector('#settings-form:not([inert])');await find('单影片','hideHomeSingleVideo');await menu.locator('[data-setting-id="hideHomeSingleVideo"]').click();assert.equal(await menu.locator('#hideHomeSingleVideo').isChecked(),true);
   await control.reload();await control.waitForSelector('#settings-form:not([inert])');assert.ok(await control.locator('.panel').evaluate(el=>el.getBoundingClientRect().height)<=600,'search preserves the browser popup height limit');
   assert.deepEqual(errors,[]);
-  console.log('PASS: classic field/picker bevels, gray arrows and navy selections; native pointer/keyboard/cancel behavior; existing layout retained; bilingual/alias/option search and focus, no search writes/theme restart, live changes/persistence, IME handling and 360/480/900px layouts.');
+  console.log('PASS: modern rounded fields/pickers, coral selection, native pointer/keyboard/cancel behavior, bilingual/alias/option search and focus, no search writes/theme restart, live changes/persistence, IME handling and 360/480/900px layouts.');
  }finally{clearTimeout(deadline);await context.close()}
 })().catch(error=>{console.error(error);process.exitCode=1});

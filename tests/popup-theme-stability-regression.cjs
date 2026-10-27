@@ -124,7 +124,7 @@ async function ready(page){await page.waitForSelector('#settings-form:not([inert
     await page.waitForFunction(()=>document.documentElement.style.getPropertyValue('--ytc-ui-opacity')==='0.67');
     const child=page.frames().find(frame=>frame.url().includes('/live_chat'));
     await child.waitForFunction(()=>document.documentElement.style.getPropertyValue('--ytc-ui-opacity')==='0.67');
-    await menu.waitForFunction(()=>document.querySelector('#status').textContent==='Applied');
+    await menu.waitForFunction(()=>!previewInFlight&&!pendingPreview&&!applicationError&&['Applied','Saved','Ready'].includes(document.querySelector('#status').textContent));
     const counts=await controller.evaluate(async tabId=>{
       const replies=await chrome.scripting.executeScript({target:{tabId,allFrames:true},func:()=>window===window.top?__menuMessages:__childMenuMessages});return replies.map(reply=>({frameId:reply.frameId,...reply.result}));
     },tab.id);

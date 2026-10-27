@@ -40,6 +40,9 @@
   const active = globalThis[INSTANCE_KEY];
   if (active?.version === SCRIPT_VERSION && !active.disposed) return;
   const appearance = !active?.disposed ? active?.releaseAppearance?.() : null;
+  // The menu can be the caller requesting this upgrade. Keep its authenticated
+  // iframe and session alive instead of disposing the caller mid-connection.
+  const settingsController = !active?.disposed ? active?.releaseSettingsController?.() : null;
   active?.dispose();
 
   let currentSettings = { ...DEFAULT_SETTINGS };
@@ -60,6 +63,8 @@
   let backgroundImageLayer = appearance?.backgroundImageLayer || null;
   let backgroundImageData = appearance?.backgroundImageData || "";
   let backgroundImageUrl = appearance?.backgroundImageUrl || "";
+  let customIconData = appearance?.customIconData || "";
+  let customIconUrl = appearance?.customIconUrl || "";
 
   // Current recommendation cards mount their hover player in a portal outside the thumbnail.
   // Use the same scopes for hiding preview UI and stopping its media, including animated images.
@@ -195,8 +200,19 @@
     else if (backgroundVideo.paused) void backgroundVideo.play().catch(() => {});
   }
 
-  function buildPlayerCss(settings, customIconData) {
-    const thumbUri = iconDataUri(settings.thumbStyle, settings.thumbColor, customIconData);
+  function syncCustomIcon() {
+    const data = currentAssets.customIconData;
+    if (data === customIconData) return;
+    const url = data ? createBackgroundUrl(data) : '';
+    if (customIconUrl) URL.revokeObjectURL(customIconUrl);
+    customIconData = data; customIconUrl = url;
+  }
+
+  function buildPlayerCss(settings) {
+    // A custom icon can be 5 MB. Keep one decoded Blob URL instead of parsing
+    // its Base64 again whenever any setting rebuilds the page stylesheet.
+    const thumbUri = settings.thumbStyle === 'custom' && customIconUrl
+      ? customIconUrl : iconDataUri(settings.thumbStyle, settings.thumbColor);
     const halfThumb = settings.thumbSize / 2;
     const progressTargets = "html body .ytp-play-progress, html body .ytp-hover-progress";
     const animation = settings.reduceAnimations ? "none" : "ytc-progress-pulse 1.1s ease-in-out infinite alternate";
@@ -705,6 +721,7 @@
     if (settings.hideHomeTopicBar) hidden.push(
       "ytd-feed-filter-chip-bar-renderer",
       "yt-chip-cloud-renderer:has(yt-chip-cloud-chip-renderer)",
+      runtime.watchFilterBarSelector,
       "ytd-browse #chips-wrapper",
       "ytd-search #chips-wrapper",
       "ytd-two-column-browse-results-renderer #chips-wrapper"
@@ -722,7 +739,11 @@
     if (settings.hideSidebarExplore) hidden.push('ytd-guide-section-renderer[data-ytc-hide-section="explore"]');
     if (settings.hideSidebarMoreFromYouTube) hidden.push('ytd-guide-section-renderer[data-ytc-hide-section="more-youtube"]');
     if (settings.hideSidebarReportHistory) hidden.push('ytd-guide-renderer ytd-guide-entry-renderer:has(#endpoint[href="/reporthistory"])');
-    if (settings.hideRelated) hidden.push("ytd-watch-next-secondary-results-renderer", "ytd-watch-flexy #related");
+    if (settings.hideRelated) hidden.push(
+      "ytd-watch-next-secondary-results-renderer",
+      ":is(ytd-watch-flexy, ytd-watch-grid) #related",
+      runtime.watchFilterBarSelector
+    );
     if (settings.hideComments) hidden.push("ytd-watch-flexy ytd-comments");
     if (settings.hideChat) hidden.push("ytd-watch-flexy ytd-live-chat-frame");
     const rules = [];
@@ -856,7 +877,7 @@
         ${scope} ytd-rich-grid-renderer > #contents > :is(ytd-rich-section-renderer, ytd-continuation-item-renderer) {
           grid-column: 1 / -1 !important;
         }
-        ${settings.equalCardHeights ? `${scope} ytd-rich-item-renderer > #content {
+        ${settings.equalCardHeights ? `${scope} ytd-rich-item-renderer:not([data-ytc-home-shorts-card="1"]) > #content {
           display: flex !important; flex-direction: column !important; height: 100% !important;
         }` : ''}
       `}
@@ -998,6 +1019,9 @@
   const homeShortsGrid = isMusic ? null : runtime.createHomeShortsGridController();
   const audio = runtime.createAudioController();
   const pipButtons = globalThis.YTCustomizerPictureInPicture?.createController();
+  let inPageSettings = settingsController || globalThis.YTCustomizerInPageSettings?.createController();
+  const videoBookmarks = globalThis.YTCustomizerVideoBookmarks?.createController();
+  const defaultShortcuts = globalThis.YTCustomizerDefaultShortcuts?.createController();
 
   function applyConfiguration(settings = sharedSettings, assets = sharedAssets, profiles = pageProfiles, media = pageAssets) {
     sharedSettings = normalize(settings);
@@ -1019,10 +1043,15 @@
     if (disposed) return;
     const nextSettings = normalize(settings);
     const assetsUnchanged = Object.keys(assetDefaults).every(key => assets[key] === currentAssets[key]);
+    const numericOnly = stylesApplied && assetsUnchanged && Object.keys(DEFAULT_SETTINGS)
+      .every(key => typeof DEFAULT_SETTINGS[key] === 'number' || nextSettings[key] === currentSettings[key]);
+    const columnsChanged = nextSettings.videosPerRow !== currentSettings.videosPerRow;
     const surfaceTokensOnly = stylesApplied && styleEl?.isConnected && assetsUnchanged &&
-      Object.keys(DEFAULT_SETTINGS).every(key => ["uiOpacity", "uiBlur", ...audioKeys].includes(key) || nextSettings[key] === currentSettings[key]);
+      Object.keys(DEFAULT_SETTINGS).every(key => ["uiOpacity", "uiBlur", "showVideoBookmarks", "useDefaultShortcuts", ...audioKeys].includes(key) || nextSettings[key] === currentSettings[key]);
     currentSettings = nextSettings;
     audio.sync(currentSettings);
+    videoBookmarks?.sync(currentSettings);
+    defaultShortcuts?.sync(currentSettings);
     if (!assetsUnchanged) currentAssets = normalizeAssets(assets);
     // Sliders update inherited tokens without surface scans or replacing the main stylesheet.
     const surfaceTokens = {
@@ -1053,9 +1082,10 @@
       styleEl.id = "yt-custom-progress-style";
     }
     if (!styleEl.isConnected) document.documentElement.appendChild(styleEl);
+    syncCustomIcon();
     syncBackgroundImage();
     syncBackgroundVideo();
-    const css = buildPlayerCss(currentSettings, currentAssets.customIconData) +
+    const css = buildPlayerCss(currentSettings) +
       buildAppearanceCss(currentSettings, currentAssets) +
       (isMusic ? runtime.buildMusicCss(currentSettings) :
         (runtime.buildHomepageGlassCss?.() || "") + (runtime.buildSurfaceCss?.() || "") + buildLayoutCss(currentSettings) +
@@ -1063,13 +1093,14 @@
     if (styleEl.textContent !== css) styleEl.textContent = css;
     document.documentElement.toggleAttribute("data-ytc-reduced-effects", currentSettings.reduceAnimations);
     document.documentElement.toggleAttribute("data-ytc-disable-video-previews", currentSettings.disableVideoPreviews);
-    if (!isMusic) {
+    if (!isMusic && !numericOnly) {
       stopActiveThumbnailPreviews();
       syncSidebarSections();
       shorts.sync();
       homeShortsGrid.sync(currentSettings);
       surfaces.apply(!stylesApplied);
     }
+    else if (!isMusic && columnsChanged) homeShortsGrid.sync(currentSettings);
     stylesApplied = true;
   }
 
@@ -1132,6 +1163,7 @@
 
   function onMessage(message, sender, sendResponse) {
     if (disposed || sender?.id !== chrome.runtime.id || !isSettingsPageUrl(sender?.url, chrome.runtime.getURL("popup.html"))) return false;
+    if (new URL(sender.url).searchParams.get("embedded") === "1" && !inPageSettings?.ownsFrameUrl(sender.url)) return false;
     if (!["YT_PROGRESS_PING", "YT_PROGRESS_LIVE_PREVIEW", "YT_AUDIO_METER"].includes(message?.type)) return;
     if (message.type === "YT_PROGRESS_LIVE_PREVIEW" &&
         (!message.settings || typeof message.settings !== "object" || Array.isArray(message.settings) ||
@@ -1173,6 +1205,8 @@
     if (backgroundImageLayer && !backgroundImageLayer.isConnected) syncBackgroundImage();
     if (backgroundVideo && !backgroundVideo.isConnected) syncBackgroundVideo();
     pipButtons?.handleMutations(records);
+    inPageSettings?.handleMutations(records);
+    videoBookmarks?.handleMutations(records);
     if (isMusic) return;
     if (records.some(record => {
       if (record.type !== "childList") return false;
@@ -1215,12 +1249,18 @@
   globalThis[INSTANCE_KEY] = {
     version: SCRIPT_VERSION,
     get disposed() { return disposed; },
+    releaseSettingsController() {
+      const controller = inPageSettings;
+      inPageSettings = null;
+      return controller;
+    },
     releaseAppearance() {
       const appearance = { styleEl, backgroundVideo, backgroundVideoData, backgroundVideoUrl,
-        backgroundImageLayer, backgroundImageData, backgroundImageUrl };
+        backgroundImageLayer, backgroundImageData, backgroundImageUrl, customIconData, customIconUrl };
       backgroundVideo?.removeEventListener("volumechange", silenceBackgroundVideo);
       styleEl = backgroundVideo = backgroundImageLayer = null;
       backgroundVideoData = backgroundVideoUrl = backgroundImageData = backgroundImageUrl = "";
+      customIconData = customIconUrl = "";
       return appearance;
     },
     dispose() {
@@ -1231,6 +1271,9 @@
       homeShortsGrid?.dispose();
       audio.dispose();
       pipButtons?.dispose();
+      inPageSettings?.dispose();
+      videoBookmarks?.dispose();
+      defaultShortcuts?.dispose();
       surfaces?.dispose();
       if (!isMusic) {
         shortsEvents.forEach(event => document.removeEventListener(event, shorts.sync, true));
@@ -1247,6 +1290,8 @@
       window.removeEventListener("popstate", syncPageProfile);
       removeBackgroundImage();
       removeBackgroundVideo();
+      if (customIconUrl) URL.revokeObjectURL(customIconUrl);
+      customIconData = customIconUrl = '';
       chrome.storage.onChanged.removeListener(onStorageChanged);
       chrome.runtime.onMessage.removeListener(onMessage);
       PREVIEW_MEDIA_EVENTS.forEach(event => document.removeEventListener(event, stopThumbnailPreview, true));

@@ -35,6 +35,7 @@
       display: grid !important;
       grid-template-columns: repeat(var(--ytc-grid-columns, 4), minmax(0, 1fr)) !important;
       gap: 16px !important;
+      align-items: stretch !important;
     }
     [${ROW}="1"]:not([hidden]) { display: contents !important; }
     [${SPAN}="1"] { grid-column: 1 / -1 !important; }
@@ -44,7 +45,60 @@
       min-width: 0 !important;
       max-width: 100% !important;
     }
-    [${CARD}="1"] { margin-inline: 0 !important; }
+    [${CARD}="1"] {
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: stretch !important;
+      justify-content: flex-start !important;
+      margin-inline: 0 !important;
+    }
+    [${LOCKUP}="1"] {
+      display: block !important;
+      height: auto !important;
+      align-self: stretch !important;
+    }
+    [${CARD}="1"] > #content {
+      display: block !important;
+      box-sizing: border-box !important;
+      width: 100% !important;
+      min-width: 0 !important;
+      height: auto !important;
+    }
+    [${LOCKUP}="1"] > :is(a:has(yt-thumbnail-view-model, ytd-thumbnail), #thumbnail) {
+      display: block !important;
+      width: 100% !important;
+      min-width: 0 !important;
+    }
+    /* Native widths can survive on several nested thumbnail wrappers. Normalize
+       the frame itself as well as the card, including rich shelves with v2 cards. */
+    [${LOCKUP}="1"] :is(.shortsLockupViewModelHostThumbnailParentContainer, yt-thumbnail-view-model, ytd-thumbnail) {
+      display: block !important;
+      position: relative !important;
+      box-sizing: border-box !important;
+      width: 100% !important;
+      min-width: 0 !important;
+      max-width: 100% !important;
+      height: auto !important;
+      min-height: 0 !important;
+      max-height: none !important;
+      aspect-ratio: 2 / 3 !important;
+      overflow: hidden !important;
+    }
+    [${LOCKUP}="1"] :is(yt-thumbnail-view-model, ytd-thumbnail) img {
+      position: absolute !important;
+      inset: 0 !important;
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover !important;
+    }
+    ${settings.equalCardHeights ? `
+    [${LOCKUP}="1"] :is(h3, #video-title:not(h3 *), .shortsLockupViewModelHostMetadataTitle) {
+      display: -webkit-box !important;
+      -webkit-box-orient: vertical !important;
+      -webkit-line-clamp: ${settings.customizeCards ? settings.cardTitleLines : 2} !important;
+      min-height: ${settings.customizeCards ? settings.cardTitleLines : 2}lh !important;
+      overflow: hidden !important;
+    }` : ''}
     [${NATIVE_FOOTER}="1"] { display: none !important; }
     [${TOGGLE}="1"] {
       display: none !important;
@@ -194,26 +248,29 @@
         attributes.set(attribute, value);
         next.set(element, attributes);
       };
-      if (home?.contains(shelf)) {
+      if (home?.contains(shelf) && isShelf(shelf)) {
         if (shelf.localName === 'ytd-rich-shelf-renderer' && shelf.hasAttribute('is-shorts')) {
           const contents = shelf.querySelector(':scope > #dismissible > #contents-container > #contents');
           const cards = contents && [...contents.children].filter(el => el.localName === 'ytd-rich-item-renderer');
-          if (cards?.some(card => card.querySelector('ytd-rich-grid-slim-media'))) {
+          if (cards?.some(card => card.querySelector('ytd-rich-grid-slim-media,' + LOCKUPS))) {
             mark(contents, GRID);
             for (const card of cards) {
               orderedCards.add(card);
               mark(card, CARD);
-              card.querySelectorAll('ytd-rich-grid-slim-media').forEach(el => mark(el, LOCKUP));
+              const content = card.querySelector(':scope > #content');
+              if (content) mark(content, LOCKUP);
+              card.querySelectorAll('ytd-rich-grid-slim-media,' + LOCKUPS).forEach(el => mark(el, LOCKUP));
             }
             for (const child of contents.children) if (!cards.includes(child)) mark(child, SPAN);
           }
-        } else if (shelf.localName === 'grid-shelf-view-model') {
+        }
+        if (shelf.localName === 'grid-shelf-view-model' || shelf.localName === 'ytd-rich-shelf-renderer') {
           const containers = new Set();
           const cards = new Set();
           for (const lockup of shelf.querySelectorAll(LOCKUPS)) {
             if (nearestShelf(lockup) !== shelf) continue;
-            const card = lockup.closest('.ytGridShelfViewModelGridShelfItem') ||
-              lockup.closest('ytm-shorts-lockup-view-model-v2') || lockup;
+            const wrapper = lockup.closest('.ytGridShelfViewModelGridShelfItem, ytd-rich-item-renderer');
+            const card = wrapper && shelf.contains(wrapper) ? wrapper : lockup.closest('ytm-shorts-lockup-view-model-v2') || lockup;
             if (!shelf.contains(card)) continue;
             cards.add(card);
             orderedCards.add(card);
@@ -264,6 +321,10 @@
 
     const observer = new MutationObserver(records => {
       for (const record of records) {
+        if (record.type === 'attributes') {
+          if (record.target.localName === 'ytd-rich-shelf-renderer') dirty.add(record.target);
+          continue;
+        }
         const elements = [...record.addedNodes, ...record.removedNodes].filter(node =>
           node instanceof HTMLElement && !isPlayer(node));
         if (!elements.length) continue;
@@ -300,8 +361,9 @@
       home = next;
       home.querySelectorAll(SHELVES).forEach(reconcile);
       home.addEventListener('click', onToggle, true);
-      // Observe structural edits only; never class/style/hidden attribute updates.
-      observer.observe(home, { childList: true, subtree: true });
+      // YouTube can mark a populated rich shelf as Shorts after mounting it.
+      // Ignore playback/style attributes while handling that structural flag.
+      observer.observe(home, { childList: true, subtree: true, attributes: true, attributeFilter: ['is-shorts'] });
     }
 
     function sync(settings) {

@@ -63,7 +63,7 @@ const fixture=`<!doctype html><html><head><style>body{margin:20px;background:#33
     const settlePreview=async()=>{await popup.evaluate(()=>new Promise(resolve=>requestAnimationFrame(resolve)));await popup.waitForFunction(()=>!previewInFlight&&!pendingPreview);};
     await page.locator('#start').click();assert.equal((await state()).context,null,'default off does not allocate an audio context');
     await popup.reload();await popup.waitForSelector('#settings-form:not([inert])');await page.bringToFront();await popup.locator('#tab-audio').click();assert.equal(await popup.locator('#volumeBoost').isDisabled(),true);
-    assert.deepEqual(await popup.locator('[role=tab]').allTextContents(),['Appearance','Player','Audio','Layout','Backup']);
+    assert.deepEqual(await popup.locator('[role=tab]').allTextContents(),['Appearance','Player','Records','Shortcuts','Audio','Layout','Backup']);
     assert.equal(await popup.evaluate(()=>YTCustomizer.audioKeys.every(key=>document.getElementById(key).closest('[role=tabpanel]').id==='audio-panel')),true,'all audio controls live on their own page');
     await popup.evaluate(async()=>{const[tab]=await chrome.tabs.query({url:'https://www.youtube.com/watch?v=audio-fixture'});await chrome.scripting.executeScript({target:{tabId:tab.id},func:()=>{
       const create=AudioContext.prototype.createMediaElementSource;AudioContext.prototype.createMediaElementSource=function(...args){globalThis.__sourceCount=(globalThis.__sourceCount||0)+1;return create.apply(this,args);};
@@ -112,8 +112,9 @@ const fixture=`<!doctype html><html><head><style>body{margin:20px;background:#33
     await page.locator('#movie_player video').evaluate(async old=>{old.pause();const video=document.createElement('video');video.loop=true;video.src=window.toneUrl;old.replaceWith(video);await video.play();});await waitRoute('processed');assert.equal((await state()).sourceCount,2,'replacement player gets its own audio graph');assert.equal((await state()).graphs,1,'removed paused players are released');
     await popup.reload();await popup.waitForSelector('#settings-form:not([inert])');await page.bringToFront();await popup.locator('#tab-audio').click();assert.equal(await popup.locator('#audioEnabled').isChecked(),true);assert.equal(await popup.locator('#volumeBoost').inputValue(),'200');
     if(process.env.YTC_SCREENSHOTS)await popup.screenshot({path:path.join(os.tmpdir(),'ytc-audio-controls.png')});
-    await popup.locator('#tab-player').focus();await popup.locator('#tab-player').press('ArrowRight');assert.equal(await popup.locator('#tab-audio').getAttribute('aria-selected'),'true');assert.equal(await popup.locator('#audio-panel').isVisible(),true);
-    await popup.locator('#tab-audio').press('ArrowLeft');assert.equal(await popup.locator('#tab-player').getAttribute('aria-selected'),'true');
+    await popup.locator('#tab-shortcuts').focus();await popup.locator('#tab-shortcuts').press('ArrowRight');assert.equal(await popup.locator('#tab-audio').getAttribute('aria-selected'),'true');assert.equal(await popup.locator('#audio-panel').isVisible(),true);
+    await popup.locator('#tab-audio').press('ArrowLeft');assert.equal(await popup.locator('#tab-shortcuts').getAttribute('aria-selected'),'true');
+    await popup.locator('#tab-player').click();
     await popup.locator('#reset').click();assert.equal(await popup.locator('#audioEnabled').isChecked(),true);assert.equal(await popup.locator('#volumeBoost').inputValue(),'200','Player reset preserves audio settings');
     await popup.locator('#progressColor').fill('#714ec7');await settlePreview();await popup.waitForFunction(async()=> (await chrome.storage.sync.get('progressColor')).progressColor==='#714ec7');
     await popup.locator('#tab-audio').click();await popup.locator('#reset').click();await waitRoute('bypass');assert.equal(await popup.locator('#audioEnabled').isChecked(),false);assert.equal(await popup.locator('#bassGainValue').textContent(),'0');assert.equal(await popup.locator('#progressColor').inputValue(),'#714ec7','Audio reset preserves Player settings');

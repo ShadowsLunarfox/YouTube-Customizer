@@ -16,6 +16,17 @@ const themePreviewVideo = document.querySelector(".theme-preview-wallpaper");
 const tabs = [...document.querySelectorAll('[role="tab"]')];
 const settingsSearch = YTCustomizerSettingsSearch.create({ activateTab: tab => activateTab(tab) });
 const localization = YTCustomizerI18n.create(document, document.getElementById("menuLanguage"), message => showStatus(message, true));
+const bookmarkStats = YTCustomizerBookmarkStats.create({ getTargetTab: getPreviewTab });
+window.addEventListener('pagehide', () => bookmarkStats.dispose(), { once: true });
+const menuThemeSelect = document.getElementById('menuTheme');
+const menuTheme = YTCustomizerMenuTheme.observe(({ preference, mode }) => {
+  document.documentElement.dataset.menuTheme = mode;
+  menuThemeSelect.value = preference;
+});
+menuThemeSelect.addEventListener('change', () => {
+  void menuTheme.setPreference(menuThemeSelect.value).catch(() => showStatus('Could not save menu theme', true));
+});
+window.addEventListener('pagehide', () => menuTheme.dispose(), { once: true });
 const assetControls = {
   customIconData: { input: "customIcon", upload: "uploadCustomIcon", remove: "removeCustomIcon" },
   backgroundImageData: { input: "backgroundImage", upload: "uploadBackground", remove: "removeBackground" }
@@ -32,17 +43,53 @@ let activeTab = "appearance";
 let saveTimer;
 let statusTimer;
 let previewFrame;
+let pendingProfileEdit = false;
 let connectionPromise;
 let pendingPreview;
 let previewInFlight = false;
+let previewIdle = Promise.resolve();
 let lastSentAssets = {};
 let applicationError = "";
 let initialized = false;
+let refreshConfigurationPromise;
+let configurationStale = false;
+let configurationRevision = 0;
+const staleConfigurationKeys = new Set();
+let previewSettings = {};
+let previewIconData;
+let previewAudioMessage;
 let previewVideoData = "";
 let previewImageData = "";
 let previewImageUrl = "";
 const windowParameters = new URLSearchParams(location.search);
 const isSettingsWindow = windowParameters.get("window") === "1";
+const isFramed = window !== window.top;
+const isEmbeddedSettings = isFramed && windowParameters.get("embedded") === "1";
+const embeddedToken = windowParameters.get("token");
+let embeddedHostOrigin = "";
+if (isFramed) document.body.inert = true;
+const embeddedContextPromise = (async () => {
+  if (!isFramed && !windowParameters.has("embedded")) return null;
+  if (!isEmbeddedSettings || !YTCustomizer.isSettingsPageUrl(location.href, chrome.runtime.getURL("popup.html"))) throw Error("Invalid settings frame");
+  const hostOrigin = location.ancestorOrigins[0];
+  if (!isYouTubeUrl(hostOrigin)) throw Error("Invalid settings host");
+  // A copied iframe URL has the public token, but cannot receive this private,
+  // source-checked reply from the content controller that owns the real dialog.
+  const secret = await new Promise((resolve, reject) => {
+    const receive = event => {
+      if (event.source !== window.parent || event.origin !== hostOrigin || event.data?.type !== "YT_SETTINGS_AUTH" ||
+          event.data.token !== embeddedToken || !/^[0-9a-f]{32}$/.test(event.data.secret || "")) return;
+      clearTimeout(timeout); window.removeEventListener("message", receive); resolve(event.data.secret);
+    };
+    const timeout = setTimeout(() => { window.removeEventListener("message", receive); reject(Error("Settings frame not authorized")); }, 5000);
+    window.addEventListener("message", receive);
+    window.parent.postMessage({ type: "YT_SETTINGS_HELLO", token: embeddedToken }, hostOrigin);
+  });
+  const context = await chrome.runtime.sendMessage({ type: "YT_SETTINGS_EMBED_CONTEXT", token: embeddedToken, secret });
+  if (!context?.ok || !Number.isSafeInteger(context.tabId) || !isYouTubeUrl(context.hostOrigin)) throw Error("Invalid settings frame");
+  embeddedHostOrigin = context.hostOrigin;
+  return context;
+})();
 const requestedTab = windowParameters.get("target");
 let previewTabId = isSettingsWindow && /^\d+$/.test(requestedTab || "") && Number.isSafeInteger(Number(requestedTab))
   ? Number(requestedTab) : undefined;
@@ -54,12 +101,57 @@ let pictureInPictureRevision = 0;
 let audioMeterTimer;
 let audioMeterRevision = 0;
 let audioMeterClosed = false;
-if (isSettingsWindow) {
+if (isSettingsWindow || isEmbeddedSettings) {
   document.documentElement.setAttribute("data-settings-window", "");
+}
+if (isSettingsWindow) {
   openWindowButton.hidden = true;
 }
+if (isEmbeddedSettings) {
+  document.documentElement.setAttribute("data-settings-embedded", "");
+  document.getElementById("closeInPage").hidden = false;
+}
+
+function notifyEmbeddedHost(type) {
+  if (isEmbeddedSettings && embeddedHostOrigin) window.parent.postMessage({ type, token: embeddedToken }, embeddedHostOrigin);
+}
+
+async function closeSettings() {
+  if (!isEmbeddedSettings) {
+    await saveSettings();
+    if (previewInFlight || pendingPreview) await flushLivePreview();
+    window.close(); return;
+  }
+  if (refreshConfigurationPromise) await refreshConfigurationPromise.catch(() => {});
+  if (!initialized || form.inert) {
+    if (initialized) showStatus("Finish the current operation in the settings window", true, false);
+    notifyEmbeddedHost("YT_SETTINGS_CLOSE_BLOCKED"); return;
+  }
+  form.inert = true;
+  try {
+    if (!await saveSettings()) { notifyEmbeddedHost("YT_SETTINGS_CLOSE_BLOCKED"); return; }
+    await storageWriteQueue;
+    if (previewInFlight || pendingPreview) await flushLivePreview();
+    notifyEmbeddedHost("YT_SETTINGS_CLOSE");
+  } catch { notifyEmbeddedHost("YT_SETTINGS_CLOSE_BLOCKED"); }
+  finally { form.inert = false; }
+}
+document.getElementById("closeInPage").addEventListener("click", () => void closeSettings());
+window.addEventListener("message", event => {
+  if (isEmbeddedSettings && event.source === window.parent && event.origin === embeddedHostOrigin && event.data?.token === embeddedToken && event.data.type === "YT_SETTINGS_REQUEST_CLOSE") void closeSettings();
+});
+document.addEventListener("keydown", event => {
+  if (isEmbeddedSettings && event.key === "Escape" && !event.defaultPrevented && !event.isComposing && !(event.target instanceof HTMLSelectElement)) {
+    event.preventDefault(); void closeSettings();
+  }
+});
 
 async function getPreviewTab() {
+  if (isEmbeddedSettings) {
+    const context = await embeddedContextPromise;
+    const tab = await chrome.tabs.get(context.tabId).catch(() => null);
+    return tab && isYouTubeUrl(tab.url) ? tab : null;
+  }
   if (!isSettingsWindow) {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     return tab;
@@ -117,12 +209,22 @@ async function updateShortcuts() {
   const outputs = { _execute_action: 'shortcutMenu', 'toggle-picture-in-picture': 'shortcutPictureInPicture', 'toggle-audio-enhancement': 'shortcutAudio' };
   try {
     const commands = await chrome.commands.getAll();
-    for (const [name, id] of Object.entries(outputs)) document.getElementById(id).textContent =
-      commands.find(command => command.name === name)?.shortcut || 'Not assigned';
+    const defaults = chrome.runtime.getManifest().commands;
+    for (const [name, id] of Object.entries(outputs)) {
+      const value = commands.find(command => command.name === name)?.shortcut;
+      const fallback = fields.useDefaultShortcuts.checked && defaults[name]?.suggested_key?.default;
+      const output = document.getElementById(id);
+      output.textContent = value || fallback || 'Not assigned'; output.dataset.state = value ? 'assigned' : fallback ? 'default' : 'unassigned';
+      output.nextElementSibling.hidden = Boolean(value || !fallback);
+    }
   } catch {
-    for (const id of Object.values(outputs)) document.getElementById(id).textContent = 'Could not load shortcuts';
+    for (const id of Object.values(outputs)) {
+      const output = document.getElementById(id); output.textContent = 'Could not load shortcuts'; output.dataset.state = 'error';
+      output.nextElementSibling.hidden = true;
+    }
   }
 }
+fields.useDefaultShortcuts.addEventListener('change', () => void updateShortcuts());
 
 document.getElementById('configureShortcuts').addEventListener('click', async () => {
   try {
@@ -145,6 +247,7 @@ function settingsWindowUrl(tabId, scope, panel) {
 }
 
 async function loadStoredConfiguration() {
+  const revision = configurationRevision;
   const [local, settings] = await Promise.all([
     chrome.storage.local.get({ ...assetDefaults, pageProfiles: {}, pageAssets: {} }),
     chrome.storage.sync.get(DEFAULT_SETTINGS)
@@ -153,20 +256,46 @@ async function loadStoredConfiguration() {
   sharedSettings = normalize(settings);
   pageProfiles = normalizeProfiles(local.pageProfiles);
   pageAssets = normalizePageAssets(local.pageAssets);
+  if (configurationRevision === revision) staleConfigurationKeys.clear();
+  configurationStale = staleConfigurationKeys.size > 0;
+  // The content runtime loads these same stored assets before acknowledging a
+  // connection. Ordinary controls only need to send setting values, not a fresh
+  // serialized copy of every wallpaper and custom icon on the first drag.
+  lastSentAssets = { ...sharedAssets };
 }
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  const expected = area === 'sync' ? sharedSettings : area === 'local' ? { ...sharedAssets, pageProfiles, pageAssets } : {};
+  for (const [key, change] of Object.entries(changes)) {
+    if (!Object.hasOwn(expected, key)) continue;
+    configurationRevision++;
+    const matches = key === 'pageProfiles' || key === 'pageAssets'
+      ? JSON.stringify(change.newValue || {}) === JSON.stringify(expected[key])
+      : (change.newValue ?? (area === 'sync' ? DEFAULT_SETTINGS[key] : '')) === expected[key];
+    // Queued saves can briefly report an earlier drag value. Its later matching
+    // notification clears that key again, so returning focus doesn't lock the UI.
+    const id = area + ':' + key;
+    if (matches) staleConfigurationKeys.delete(id); else staleConfigurationKeys.add(id);
+  }
+  configurationStale = staleConfigurationKeys.size > 0;
+});
 
 // Another menu can change settings while this window stays open. Refresh when
 // returning to it so the next edit cannot overwrite that menu's saved values.
 async function refreshStoredConfiguration() {
+  if (refreshConfigurationPromise) return refreshConfigurationPromise;
   if (!initialized || form.inert) return false;
   form.inert = true;
-  try {
+  const refresh = (async () => {
     if (saveTimer !== undefined && !await saveSettings()) return false;
     await storageWriteQueue;
     await loadStoredConfiguration();
     showSelectedScope();
     return true;
-  } finally { form.inert = false; }
+  })();
+  refreshConfigurationPromise = refresh;
+  try { return await refresh; }
+  finally { if (refreshConfigurationPromise === refresh) { refreshConfigurationPromise = undefined; form.inert = false; } }
 }
 
 async function focusSettingsWindow(context) {
@@ -178,12 +307,13 @@ async function focusSettingsWindow(context) {
   activateTab(document.getElementById("tab-" + context.panel));
   history.replaceState(null, "", settingsWindowUrl(previewTabId, editingScope, activeTab));
   connectionPromise = undefined;
-  lastSentAssets = {};
+  lastSentAssets = { ...sharedAssets };
   void checkCurrentTabConnection();
   return chrome.windows.getCurrent();
 }
 
 openWindowButton.addEventListener("click", async () => {
+  if (refreshConfigurationPromise) await refreshConfigurationPromise.catch(() => {});
   if (!initialized || form.inert) return;
   openWindowButton.disabled = true;
   form.inert = true;
@@ -204,16 +334,19 @@ openWindowButton.addEventListener("click", async () => {
         width: Math.min(520, screen.availWidth || 520), height: Math.min(760, screen.availHeight || 760)
       });
     }
-    window.close();
+    if (isEmbeddedSettings) notifyEmbeddedHost("YT_SETTINGS_CLOSE"); else window.close();
   } catch (error) { showStatus(error.message || "Could not open settings window", true, false); }
   finally { openWindowButton.disabled = false; form.inert = false; }
 });
 
 window.addEventListener("focus", async () => {
   try {
-    if (await refreshStoredConfiguration()) void checkCurrentTabConnection();
+    // Focus also fires when the host initially reveals the iframe and when a
+    // native control returns focus. Only external edits require a storage reload.
+    if (configurationStale && await refreshStoredConfiguration()) void checkCurrentTabConnection();
     if (initialized && activeTab === "player") void updatePictureInPicture();
-    if (initialized) void updateShortcuts();
+    if (initialized && activeTab === "shortcuts") void updateShortcuts();
+    if (initialized && activeTab === 'records') void bookmarkStats.refresh();
     syncAudioMonitor();
   }
   catch { showStatus("Could not refresh settings", true); }
@@ -239,11 +372,13 @@ function readForm() {
 
 function writeForm(settings) {
   const next = normalize(settings);
+  const defaultsChanged = fields.useDefaultShortcuts.checked !== next.useDefaultShortcuts;
   for (const [key, input] of Object.entries(fields)) {
     if (input.type === "checkbox") input.checked = next[key];
     else input.value = next[key];
   }
   updatePreview();
+  if (initialized && defaultsChanged) void updateShortcuts();
 }
 
 function updateScopeControls() {
@@ -253,11 +388,10 @@ function updateScopeControls() {
   document.getElementById("scopeHint").textContent = editingScope === "shared"
     ? "Pages without separate settings use this configuration."
     : (pageProfiles[editingScope]?.enabled ? "Separate appearance and layout are active. " : "Using shared settings; editing appearance or layout creates a separate configuration. ") +
-      "Player and Audio settings are shared.";
+      "Player, Records and Audio settings are shared.";
 }
 
-function captureForm(profileEdit = false) {
-  const next = readForm();
+function captureForm(profileEdit = false, next = readForm()) {
   if (editingScope === "shared") sharedSettings = next;
   else {
     for (const key of Object.keys(DEFAULT_SETTINGS)) if (!profileKeys.includes(key)) sharedSettings[key] = next[key];
@@ -280,17 +414,16 @@ function showSelectedScope() {
   updateScopeControls();
 }
 
-function updatePreview() {
+function updatePreview(settings = readForm()) {
   const videoBackground = assets.backgroundImageData.startsWith("data:video/mp4;");
-  if (videoBackground && fields.backgroundFit.value === "tile") fields.backgroundFit.value = "cover";
-  const settings = readForm();
+  if (videoBackground && settings.backgroundFit === "tile") fields.backgroundFit.value = settings.backgroundFit = "cover";
   for (const id of ["barHeight", "thumbSize", "backgroundOpacity", "uiOpacity", "uiBlur", "relatedThumbnailWidth", ...cardKeys.filter(key => typeof DEFAULT_SETTINGS[key] === "number" && key !== "cardTitleLines")]) {
-    document.getElementById(id + "Value").value = settings[id];
+    if (previewSettings[id] !== settings[id]) document.getElementById(id + "Value").value = settings[id];
   }
   for (const id of ["volumeBoost", "bassGain", "midGain", "trebleGain"]) {
-    document.getElementById(id + "Value").value = (id !== "volumeBoost" && settings[id] > 0 ? "+" : "") + settings[id];
+    if (previewSettings[id] !== settings[id]) document.getElementById(id + "Value").value = (id !== "volumeBoost" && settings[id] > 0 ? "+" : "") + settings[id];
   }
-  document.getElementById("audioBalanceValue").value = settings.audioBalance === 0 ? "Center" :
+  if (previewSettings.audioBalance !== settings.audioBalance) document.getElementById("audioBalanceValue").value = settings.audioBalance === 0 ? "Center" :
     (settings.audioBalance < 0 ? "L " : "R ") + Math.abs(settings.audioBalance);
   for (const key of audioKeys) if (key !== "audioEnabled") fields[key].disabled = !settings.audioEnabled;
   for (const key of cardKeys) fields[key].disabled = !settings.customizeCards;
@@ -300,14 +433,17 @@ function updatePreview() {
   preview.dataset.reduceAnimations = String(settings.reduceAnimations);
   preview.style.setProperty("--buffer-color", settings.bufferColor);
   preview.style.setProperty("--heatmap-color", settings.heatmapColor);
-  preview.style.setProperty("--bar-height", settings.barHeight + "px");
-  preview.style.setProperty("--thumb-size", settings.thumbSize + "px");
-  previewThumb.style.backgroundImage = 'url("' + iconDataUri(settings.thumbStyle, settings.thumbColor, assets.customIconData) + '")';
+  preview.style.setProperty("--bar-height", "calc(" + settings.barHeight + " * var(--ui-unit))");
+  preview.style.setProperty("--thumb-size", "calc(" + settings.thumbSize + " * var(--ui-unit))");
+  if (previewSettings.thumbStyle !== settings.thumbStyle || previewSettings.thumbColor !== settings.thumbColor || previewIconData !== assets.customIconData) {
+    previewThumb.style.backgroundImage = 'url("' + iconDataUri(settings.thumbStyle, settings.thumbColor, assets.customIconData) + '")';
+    previewIconData = assets.customIconData;
+  }
   fields.thumbColor.disabled = settings.thumbStyle === "custom";
 
   const theme = settings.themeEnabled ? settings : DEFAULT_SETTINGS;
   themePreview.style.setProperty("--theme-ui-opacity", settings.themeEnabled ? settings.uiOpacity + "%" : "100%");
-  themePreview.style.setProperty("--theme-backdrop-filter", settings.themeEnabled && settings.uiBlur > 0 ? "blur(" + settings.uiBlur + "px)" : "none");
+  themePreview.style.setProperty("--theme-backdrop-filter", settings.themeEnabled && settings.uiBlur > 0 ? "blur(calc(" + settings.uiBlur + " * var(--ui-unit)))" : "none");
   for (const [css, key] of [["page", "pageColor"], ["surface", "surfaceColor"], ["text", "textColor"], ["accent", "accentColor"]]) {
     themePreview.style.setProperty("--theme-" + css, theme[key]);
   }
@@ -342,9 +478,9 @@ function updatePreview() {
     themePreviewVideo.style.objectFit = settings.backgroundFit;
     themePreviewVideo.style.opacity = String(settings.backgroundOpacity / 100);
     themePreviewVideo.hidden = false;
-    void themePreviewVideo.play().catch(() => {});
+    if (themePreviewVideo.paused) void themePreviewVideo.play().catch(() => {});
   } else {
-    themePreviewVideo.pause();
+    if (!themePreviewVideo.paused) themePreviewVideo.pause();
     themePreviewVideo.hidden = true;
     if (!videoBackground && previewVideoData) {
       previewVideoData = "";
@@ -363,6 +499,7 @@ function updatePreview() {
   for (const key of ["backgroundFit", "backgroundOpacity"]) {
     fields[key].disabled = !assets.backgroundImageData || settings.backgroundMode !== "image";
   }
+  previewSettings = settings;
 }
 
 function updateAudioStatus(status) {
@@ -371,8 +508,9 @@ function updateAudioStatus(status) {
     unsupported: "This video cannot be processed. Its original audio is preserved.",
     error: "Audio processing is unavailable for this player."
   };
-  document.getElementById("audioStatus").textContent = !fields.audioEnabled.checked ? "Audio processing is off." :
+  const message = !fields.audioEnabled.checked ? "Audio processing is off." :
     messages[status] || "Play a video to apply audio settings. Click the video once if needed.";
+  if (message !== previewAudioMessage) document.getElementById("audioStatus").textContent = previewAudioMessage = message;
 }
 
 function renderAudioMonitor(audio, error) {
@@ -467,7 +605,7 @@ async function connectToCurrentTab() {
   if (response?.version !== SCRIPT_VERSION) {
     await chrome.scripting.executeScript({
       target: { tabId: tab.id, allFrames: true },
-      files: ["settings.js", "content/surface-controller.js", "content/shorts-controller.js", "content/homepage-glass.js", "content/home-shorts-grid.js", "content/audio-controller.js", "content/music-theme.js", "content/picture-in-picture.js", "yt.js"]
+      files: ["settings.js", "i18n.js", "menu-theme.js", "content/surface-controller.js", "content/shorts-controller.js", "content/homepage-glass.js", "content/home-shorts-grid.js", "content/audio-controller.js", "content/music-theme.js", "content/picture-in-picture.js", "content/in-page-settings.js", "content/video-bookmarks.js", "content/default-shortcuts.js", "yt.js"]
     });
     response = await ping();
   }
@@ -498,8 +636,10 @@ function applyToCurrentTab() {
 }
 
 async function flushLivePreview() {
-  if (previewInFlight) return;
+  if (previewInFlight) return previewIdle;
   previewInFlight = true;
+  let finishPreview;
+  previewIdle = new Promise(resolve => { finishPreview = resolve; });
   try {
     connectionPromise ||= connectToCurrentTab();
     let tabId = await connectionPromise;
@@ -540,12 +680,14 @@ async function flushLivePreview() {
     showStatus(applicationError, true);
   } finally {
     previewInFlight = false;
+    finishPreview();
   }
 }
 
 async function saveSettings(message = "Saved") {
   clearTimeout(saveTimer);
   saveTimer = undefined;
+  if (previewFrame !== undefined) flushSettingsPreview();
   captureForm();
   const settings = { ...sharedSettings }, profiles = normalizeProfiles(pageProfiles);
   const write = storageWriteQueue.then(async () => {
@@ -563,11 +705,22 @@ async function saveSettings(message = "Saved") {
   }
 }
 
-function settingsChanged(commit = false, profileEdit = false) {
-  captureForm(profileEdit);
-  updatePreview();
+function flushSettingsPreview() {
   cancelAnimationFrame(previewFrame);
-  previewFrame = requestAnimationFrame(applyToCurrentTab);
+  previewFrame = undefined;
+  const settings = readForm();
+  updatePreview(settings);
+  captureForm(pendingProfileEdit, settings);
+  pendingProfileEdit = false;
+  applyToCurrentTab();
+}
+
+function settingsChanged(commit = false, profileEdit = false) {
+  pendingProfileEdit ||= profileEdit;
+  // Coalesce native range events to one preview per animation frame. The change,
+  // blur and close paths flush immediately so the final value is always saved.
+  if (commit) flushSettingsPreview();
+  else if (previewFrame === undefined) previewFrame = requestAnimationFrame(flushSettingsPreview);
   clearTimeout(saveTimer);
   if (commit) void saveSettings();
   else saveTimer = setTimeout(() => void saveSettings(), 350);
@@ -586,14 +739,22 @@ function activateTab(tab, focus = false) {
   document.getElementById("reset").disabled = activeTab === "backup";
   if (focus) tab.focus();
   if (initialized && activeTab === "player") void updatePictureInPicture();
+  if (initialized && activeTab === 'shortcuts') void updateShortcuts();
+  bookmarkStats.setVisible(initialized && activeTab === 'records');
   syncAudioMonitor();
 }
 
+const sideNavigation = matchMedia('(min-width: 760px) and (min-height: 761px)');
+function updateNavigationOrientation() {
+  document.querySelector('.tabs').setAttribute('aria-orientation', isSettingsWindow && sideNavigation.matches ? 'vertical' : 'horizontal');
+}
+sideNavigation.addEventListener('change', updateNavigationOrientation);
+updateNavigationOrientation();
 tabs.forEach((tab, index) => {
   tab.addEventListener("click", () => activateTab(tab));
   tab.addEventListener("keydown", event => {
-    const next = event.key === "ArrowRight" ? (index + 1) % tabs.length :
-      event.key === "ArrowLeft" ? (index + tabs.length - 1) % tabs.length :
+    const next = ["ArrowRight", "ArrowDown"].includes(event.key) ? (index + 1) % tabs.length :
+      ["ArrowLeft", "ArrowUp"].includes(event.key) ? (index + tabs.length - 1) % tabs.length :
       event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : -1;
     if (next >= 0) { event.preventDefault(); activateTab(tabs[next], true); }
   });
@@ -630,6 +791,7 @@ document.getElementById("editingScope").addEventListener("change", async event =
 
 document.getElementById("pageProfileEnabled").addEventListener("change", event => {
   const enabled = event.target.checked;
+  if (previewFrame !== undefined) flushSettingsPreview();
   captureForm();
   pageProfiles[editingScope] = { settings: {}, ...pageProfiles[editingScope], enabled };
   showSelectedScope();
@@ -760,10 +922,7 @@ document.querySelector("#resetAll").addEventListener("click", () => {
   showSelectedScope();
   settingsChanged(true);
 });
-document.querySelector("#closePopup").addEventListener("click", async () => {
-  await saveSettings();
-  window.close();
-});
+document.querySelector("#closePopup").addEventListener("click", () => void closeSettings());
 
 document.getElementById("exportSettings").addEventListener("click", async () => {
   const button = document.getElementById("exportSettings");
@@ -844,7 +1003,8 @@ document.getElementById("backupFile").addEventListener("change", async event => 
 
 const initializationPromise = (async () => {
   try {
-    const [, currentTab] = await Promise.all([loadStoredConfiguration(), getPreviewTab(), localization.ready]);
+    await embeddedContextPromise;
+    const [, currentTab] = await Promise.all([loadStoredConfiguration(), getPreviewTab(), localization.ready, menuTheme.ready]);
     const activeScope = pageScope(currentTab?.url);
     if (pageProfiles[activeScope]?.enabled) editingScope = activeScope;
     const requestedScope = windowParameters.get("scope"), requestedPanel = windowParameters.get("panel");
@@ -852,12 +1012,15 @@ const initializationPromise = (async () => {
     showSelectedScope();
     if (isSettingsWindow && tabs.some(tab => tab.id === "tab-" + requestedPanel)) activateTab(document.getElementById("tab-" + requestedPanel));
     initialized = true;
+    if (isEmbeddedSettings) document.body.inert = false;
     form.inert = false;
     openWindowButton.disabled = false;
     void updateShortcuts();
     void checkCurrentTabConnection();
     if (activeTab === "player") void updatePictureInPicture();
+    bookmarkStats.setVisible(activeTab === 'records');
     syncAudioMonitor();
+    notifyEmbeddedHost("YT_SETTINGS_READY");
   } catch {
     showStatus("Could not load settings. Reopen the extension.", true);
   }

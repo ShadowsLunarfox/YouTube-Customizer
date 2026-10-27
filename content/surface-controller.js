@@ -83,6 +83,13 @@
   runtime.playablesShelfSelector = PLAYABLES_SHELF_SELECTOR;
   runtime.playablesShelfTypeSelector = PLAYABLES_SHELF_TYPE_SELECTOR;
   runtime.playablesCardTypes = PLAYABLES_CARD_TYPES;
+  const WATCH_FILTER_BAR_SELECTOR = ':is(ytd-watch-flexy, ytd-watch-grid) ' +
+    ':is(#related, ytd-watch-next-secondary-results-renderer) yt-chip-cloud-renderer';
+  runtime.watchFilterBarSelector = WATCH_FILTER_BAR_SELECTOR;
+  const WATCH_FILTER_SHARED_SELECTOR = ':is(ytd-watch-flexy, ytd-watch-grid) ' +
+    'ytd-watch-next-secondary-results-renderer yt-chip-cloud-renderer';
+  const WATCH_FILTER_INNER_SELECTOR = WATCH_FILTER_BAR_SELECTOR + ' :is(#container, #scroll-container, ' +
+    '#chips, #left-arrow, #right-arrow, #left-arrow-button, #right-arrow-button, #chip-container, #chip-shape-container)';
   const MEMBERSHIPS_PAGE_SELECTOR = 'ytd-browse[page-subtype="channel-memberships-shopfront"]:not([hidden])';
   const MEMBERSHIPS_PAGE_HERO_SELECTOR = MEMBERSHIPS_PAGE_SELECTOR + ' yt-sponsorships-destination-hub-header-view-model';
   const MEMBERSHIPS_PAGE_CARD_SELECTOR = MEMBERSHIPS_PAGE_SELECTOR + ' .ytLockupViewModelHost';
@@ -193,6 +200,7 @@
     "ytd-multi-page-menu-renderer > #header ytd-simple-menu-header-renderer",
     "ytd-feed-filter-chip-bar-renderer:has(#chips-wrapper)", "ytd-feed-filter-chip-bar-renderer yt-chip-cloud-renderer",
     "yt-chip-cloud-chip-renderer #chip-container", "yt-chip-cloud-chip-renderer .ytChipShapeChip",
+    WATCH_FILTER_SHARED_SELECTOR, WATCH_FILTER_INNER_SELECTOR,
     "ytd-rich-item-renderer yt-lockup-view-model",
     TOPICS_SHELF_SELECTOR + " ytd-rich-shelf-renderer",
     TOPICS_SHELF_SELECTOR + " ytd-rich-shelf-renderer .button-container",
@@ -301,7 +309,8 @@
     ${CHANNEL_PANEL_SELECTOR} :is(${CHANNEL_CARD_TYPES}),
     :is(${LIBRARY_PANEL_SELECTOR}) :is(${LIBRARY_CARD_TYPES}),
     :is(${LIBRARY_PANEL_SELECTOR}, ${LIBRARY_CARD_SELECTOR}, ${LIBRARY_HEADER_SELECTOR},
-      ${LIBRARY_HISTORY_CONTROLS_SELECTOR}) .ytSpecButtonShapeNextHost`;
+      ${LIBRARY_HISTORY_CONTROLS_SELECTOR}) .ytSpecButtonShapeNextHost,
+    ${WATCH_FILTER_BAR_SELECTOR} :is(yt-chip-cloud-chip-renderer, .ytSpecButtonShapeNextHost)`;
   const HOMEPAGE_SCOPE_SELECTOR = 'ytd-browse[page-subtype="home"]';
   const LIVE_CHAT_SHADOW_STYLE_ATTR = "data-ytc-live-chat-surface";
   const LIVE_CHAT_SHADOW_CSS = `
@@ -1226,6 +1235,124 @@
       }
     `;
   }
+  function buildWatchFilterCss() {
+    const bar = 'html[data-ytc-theme] ' + WATCH_FILTER_BAR_SELECTOR;
+    return `
+      /* Keep native/layout visibility in charge of the frame; the skin must not
+         force it open. Preserve the native strip transform and arrow visibility. */
+      ${bar} {
+        --ytc-watch-chip-fill: color-mix(in srgb, var(--yt-spec-text-primary) calc(var(--ytc-ui-opacity) * 24%), transparent);
+        box-sizing: border-box !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        margin: 0 0 12px !important;
+        padding: 6px 8px !important;
+        border: 1px solid color-mix(in srgb, var(--yt-spec-text-primary) 22%, transparent) !important;
+        border-radius: 12px !important;
+        overflow: hidden !important;
+        color: var(--yt-spec-text-primary) !important;
+      }
+      ${bar} #container {
+        position: relative !important;
+        box-sizing: border-box !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        height: auto !important;
+        min-height: 36px !important;
+      }
+      ${bar} #scroll-container {
+        box-sizing: border-box !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        height: auto !important;
+        min-height: 36px !important;
+        margin: 0 !important;
+        padding: 2px 0 !important;
+        overflow: hidden !important;
+      }
+      ${bar} #chips { margin: 0 !important; padding: 0 !important; white-space: nowrap !important; }
+      /* Reserve visual room for arrows without changing YouTube's scroll-distance calculations. */
+      ${bar}:not([at-end]):has(#right-arrow button) #scroll-container {
+        -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent calc(100% - 40px)) !important;
+        mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent calc(100% - 40px)) !important;
+      }
+      ${bar}:not([at-start]):has(#left-arrow button) #scroll-container {
+        -webkit-mask-image: linear-gradient(to right, transparent 40px, #000 40px) !important;
+        mask-image: linear-gradient(to right, transparent 40px, #000 40px) !important;
+      }
+      ${bar}:not([at-start]):not([at-end]):has(#left-arrow button):has(#right-arrow button) #scroll-container {
+        -webkit-mask-image: linear-gradient(to right, transparent 40px, #000 40px, #000 calc(100% - 40px), transparent calc(100% - 40px)) !important;
+        mask-image: linear-gradient(to right, transparent 40px, #000 40px, #000 calc(100% - 40px), transparent calc(100% - 40px)) !important;
+      }
+      ${bar} yt-chip-cloud-chip-renderer {
+        --ytc-universal-glass: var(--ytc-watch-chip-fill) !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+        height: 32px !important;
+        min-height: 32px !important;
+        max-height: 32px !important;
+        margin: 0 8px 0 0 !important;
+        border: 1px solid color-mix(in srgb, var(--yt-spec-text-primary) 18%, transparent) !important;
+        border-radius: 8px !important;
+        overflow: hidden !important;
+        vertical-align: middle !important;
+        color: var(--yt-spec-text-primary) !important;
+      }
+      ${bar} yt-chip-cloud-chip-renderer:is([selected], :has(button[aria-selected="true"])) {
+        --ytc-universal-glass: color-mix(in srgb, var(--yt-spec-call-to-action) calc(var(--ytc-ui-opacity) * 80%), transparent) !important;
+        border-color: color-mix(in srgb, var(--yt-spec-call-to-action) 70%, transparent) !important;
+      }
+      ${bar} :is(#chip-container, #chip-shape-container, .ytChipShapeChip) {
+        box-sizing: border-box !important;
+        height: 30px !important;
+        min-height: 0 !important;
+        border-radius: 7px !important;
+        color: inherit !important;
+      }
+      ${bar} #chip-container { display: inline-flex !important; align-items: center !important; }
+      ${bar} :is(.ytChipShapeButtonReset, .ytChipShapeText, #text) { color: inherit !important; }
+      ${bar} .ytChipShapeButtonReset { height: 30px !important; min-height: 0 !important; border-radius: 7px !important; }
+      ${bar} :is(#left-arrow, #right-arrow) {
+        top: 0 !important;
+        bottom: 0 !important;
+        width: 40px !important;
+        height: 100% !important;
+        padding: 0 !important;
+      }
+      ${bar} :is(#left-arrow-button, #right-arrow-button) {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 40px !important;
+        height: 100% !important;
+      }
+      ${bar} :is(#left-arrow, #right-arrow) .ytSpecButtonShapeNextHost {
+        --ytc-universal-glass: var(--ytc-watch-chip-fill) !important;
+        box-sizing: border-box !important;
+        width: 32px !important;
+        min-width: 32px !important;
+        height: 32px !important;
+        min-height: 32px !important;
+        padding: 0 !important;
+        border: 1px solid color-mix(in srgb, var(--yt-spec-text-primary) 22%, transparent) !important;
+        border-radius: 50% !important;
+        color: var(--yt-spec-text-primary) !important;
+      }
+      ${bar} :is(#left-arrow, #right-arrow)::before,
+      ${bar} :is(#left-arrow, #right-arrow)::after {
+        background: transparent !important;
+        background-image: none !important;
+        box-shadow: none !important;
+        pointer-events: none !important;
+      }
+      ${bar} :is(button, yt-chip-cloud-chip-renderer):focus-visible {
+        outline: 2px solid var(--yt-spec-call-to-action) !important;
+        outline-offset: -2px !important;
+      }
+    `;
+  }
   // Share the same targets with CSS so new UI surfaces are styled before the observer runs.
   runtime.buildSurfaceCss = () => `
     /* Named view-transition surfaces prevent descendants from sampling the wallpaper in Chrome. */
@@ -1342,6 +1469,7 @@
       box-shadow: none !important;
       backdrop-filter: none !important;
     }
+    ${buildWatchFilterCss()}
     ${buildChannelSurfaceCss()}
     ${buildLibrarySurfaceCss()}
     ${buildMembershipsPageCss()}

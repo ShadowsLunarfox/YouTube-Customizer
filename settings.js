@@ -9,6 +9,8 @@
     thumbStyle: "circle",
     barHeight: 5,
     thumbSize: 16,
+    showVideoBookmarks: true,
+    useDefaultShortcuts: true,
     audioEnabled: false,
     volumeBoost: 100,
     bassGain: 0,
@@ -75,6 +77,8 @@
   const tabKeys = Object.freeze({
     appearance: ["themeEnabled", "pageColor", "surfaceColor", "uiOpacity", "uiBlur", "textColor", "accentColor", "backgroundMode", "backgroundFit", "backgroundOpacity"],
     player: ["progressColor", "progressEffect", "bufferColor", "heatmapColor", "thumbColor", "thumbStyle", "barHeight", "thumbSize"],
+    records: ["showVideoBookmarks"],
+    shortcuts: ["useDefaultShortcuts"],
     audio: audioKeys,
     layout: ["videosPerRow", "customizeCards", "cardRadius", "cardBorderWidth", "cardPadding", "cardGap", "shelfSpacing", "cardTitleLines", "equalCardHeights", "hideHomePlayables", "hideHomeSingleVideo", "hideHomeFeatured", "hideHomeTopicShelves", "hideHomeShopping", "disableVideoPreviews", "hideHomeTopicBar", "hideCreateButton", "hideNotificationsButton", "hideSidebarSubscriptions", "hideSidebarYou", "hideSidebarExplore", "hideSidebarMoreFromYouTube", "hideSidebarReportHistory", "relatedThumbnailWidth", "hideShorts", "hideRelated", "hideComments", "hideChat", "reduceAnimations"]
   });
@@ -261,7 +265,12 @@
     try {
       const url = new URL(value), endpoint = new URL(value), parameters = url.searchParams;
       endpoint.search = "";
-      if (endpoint.href !== popupUrl || parameters.get("window") !== "1") return false;
+      if (endpoint.href !== popupUrl) return false;
+      if (parameters.get("embedded") === "1") {
+        return [...parameters.keys()].every(key => ["embedded", "token"].includes(key) && parameters.getAll(key).length === 1) &&
+          /^[0-9a-f]{32}$/.test(parameters.get("token") || "");
+      }
+      if (parameters.get("window") !== "1") return false;
       const allowed = ["window", "target", "scope", "panel"];
       if ([...parameters.keys()].some(key => !allowed.includes(key) || parameters.getAll(key).length !== 1)) return false;
       const target = parameters.get("target"), scope = parameters.get("scope"), panel = parameters.get("panel");
@@ -280,7 +289,7 @@
   }
 
   globalThis.YTCustomizer = Object.freeze({
-    version: "119", defaults, assetDefaults, presets, tabKeys, audioKeys, normalize, normalizeAssets,
+    version: "136", defaults, assetDefaults, presets, tabKeys, audioKeys, normalize, normalizeAssets,
     pageScopes, profileKeys, cardKeys, normalizeProfiles, normalizePageAssets, pageScope, resolveSettings, resolveAssets, createBackup, parseBackup,
     isImageData, isBackgroundData, isYouTubeUrl, isSettingsPageUrl, iconDataUri
   });

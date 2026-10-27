@@ -33,13 +33,16 @@
 
 ### ▶️ Player
 
-- In **Player → Picture-in-picture**, click **Open floating video** to open the current video in a native floating window. Click **Return video to tab** to close it. Both the toolbar menu and separate settings window support this action; wallpapers and thumbnail previews are excluded, and playback position, volume, and mute are preserved.
+- **Timeline notes:** click the thin strip just above the player's progress bar to pin that position and open a yellow sticky note. **＋ Note** adds one at the current playback time. Write an optional multiline note and save; click its gold pin to read, edit, delete or jump to that timestamp. Opening a note does not seek or pause the video; normal timeline scrubbing stays available. Notes remain in the player in normal, theater and fullscreen views, and fit the player on small screens. Existing records persist locally per video and update across tabs showing the same video. **Records → Show video bookmarks** hides the notes and pins without deleting records. Local notes are separate from the settings JSON backup. Ads and live streams cannot create or use timestamps.
+- The dedicated **Records** tab groups **Video bookmarks** and **Timeline record statistics**. Statistics show the number of locally recorded videos, total timeline points and points containing a written sticky note. They also show the current video's record count, with an optional list sorted by time. Saved and deleted records update these read-only totals automatically; an independent settings window stays bound to its original video tab as it navigates. Empty and malformed records are excluded. Statistics load only while Records is open and avoid loading stored wallpapers where the browser supports key-only storage enumeration. Search for “statistics” or “统计” to reach the section. Resetting the Records tab restores its display preference and preserves saved records.
+- In **Player → Picture-in-picture**, click **Open floating video** to open the current video in a native floating window. Click **Return video to tab** to close it. Both the in-page menu and separate settings window support this action; wallpapers and thumbnail previews are excluded, and playback position, volume, and mute are preserved.
 - A Picture-in-picture icon also appears at the left edge of the player's right-hand controls, before CC/settings, so you can open or close the floating video without opening the extension menu. It follows the native controls in theater/fullscreen mode and returns when YouTube rebuilds its player controls.
 - Customize progress and buffered-segment colors, progress-bar thickness, and scrubber size.
 - Choose a separate color for the **Most replayed** heatmap, including its gradient and outline.
 - Choose a solid color, pulsing glow, moving shimmer, or cycling rainbow effect.
 - Pick a built-in scrubber shape or upload a custom image or GIF.
-- In **Player → Keyboard shortcuts**, see the browser's current bindings for opening the menu, toggling video picture-in-picture, and toggling audio enhancement. **Change shortcuts...** opens the browser's extension shortcut editor, where you can choose another combination or clear it to disable it. The suggested combinations are Alt+Shift+Y, Alt+Shift+P, and Alt+Shift+A; a combination that cannot be assigned is shown as **Not assigned**. Video/audio actions run only on YouTube and skip input fields, editors, and focused chat frames.
+- The independent **Shortcuts** tab contains the current bindings, **Use default shortcuts on YouTube**, and **Change shortcuts...**. Defaults are **Alt+Shift+Y** for the menu, **Alt+Shift+P** for picture-in-picture, and **Alt+Shift+A** for audio enhancement. Browser-assigned shortcuts always take priority. If a command is unassigned, the defaults option (enabled initially) activates its default within YouTube and labels it **YouTube default**. Turn it off to disable these page defaults; **Change shortcuts...** opens the browser editor to change or clear browser bindings. Defaults ignore typing, composition, repeated keys, editors and focused chat frames. Resetting the tab restores the defaults option without changing browser bindings or Player settings.
+- The shortcut section wraps long labels and key combinations. Short settings windows scroll the form as a whole, so labels, help text and the edit button remain reachable instead of being cut by a small inner panel.
 
 ### Audio
 
@@ -54,21 +57,28 @@
 - Home Premium image and single-video promotions share the rounded glass frame, inset artwork and text, and section spacing. Their content wraps on narrow windows; video cards keep their own inset frame and usable menus.
 - At the top of **Layout → Home sections**, independently hide **single-video promotions** or **YouTube Playables games**. The all-featured/membership/Premium option includes single-video promotions; topic and shopping recommendations have their own switches. Hidden sections release their feed space. These choices are saved with the selected page configuration and work with the theme turned off.
 - Home Shorts initially show one row. Show more reveals the additional cards; changing the column setting collapses the shelf again.
+- Shorts cards in both classic and modern Home shelves use equal-width columns and matching 2:3 thumbnail frames, including modern lockups inside classic rich-shelf wrappers. Equal row heights reserves the configured title lines so view counts align below the thumbnails.
 - Library pages use rounded panels and cards with the shared theme background, opacity, and blur: History, Playlists, Watch later, Liked videos, Downloads, Courses, and Clips.
 - Channel memberships has a themed header, wrapping topic filters, rounded video and creator cards, and clearly separated section headings. Creator names and prices appear below their artwork.
-- Hide Shorts, the topic filter bar, the Create button, or the notifications button.
+- Hide Shorts, topic filter bars (including the filters above recommended videos), the Create button, or the notifications button. Hiding a filter removes its frame and reserved space, including while recommendations are loading.
 - Independently hide Subscriptions, You, Explore, More from YouTube, and Report history in the sidebar.
-- Adjust related-video thumbnail width, or hide related videos, comments, or live chat.
+- Adjust related-video thumbnail width, or hide related videos (including their filter bar), comments, or live chat.
+- Watch-page recommendation filters use an inset rounded frame, aligned 32 px chips and circular arrows. The filter shares the recommendation panel's glass instead of stacking extra backgrounds and blur. Native filtering and horizontal scrolling remain available; labels stay clear of the arrow controls. Styling is scoped to watch recommendations and restores with the page theme disabled.
 
 ### Page settings and backups
 
+- Click the **YouTube Customizer icon immediately to the left of your YouTube avatar** to open the complete settings menu in a dialog on the page. The browser extension button and its menu shortcut open the same dialog on YouTube. The modern interface supports light and dark themes, coral accents, rounded controls and matching line icons. Wide windows show category navigation in a sidebar; narrow windows use horizontal tabs. Text, buttons, fields, sliders, checkboxes, spacing and previews scale together. Short windows let the form scroll so its footer remains reachable. The responsive dialog keeps at least 12 px clear around its edges. Use the top-right **×**, the bottom **Close** button, Escape, or the backdrop to close it; pending edits are saved first. The dialog stays bound to its original YouTube tab.
 - Use **Editing settings for** to edit shared settings or separate appearance and layout for **YouTube Home**, **Watch pages / Shorts**, and **YouTube Music**. Editing a page creates its override; turn off **Use separate appearance and layout** to return to shared settings. Player and Audio settings are shared.
 - Each page can have its own wallpaper. Page configurations and uploaded media are stored locally; shared settings continue to use browser sync storage.
 - Click **Open window** in the menu title bar to move the entire settings menu into a separate, resizable browser window. It keeps your selected settings tab and page configuration, previews on the originating YouTube tab, and remains open while you browse. Clicking Open window again reuses the existing window.
-- The title-bar language selector supports **Auto / 自动**, **中文**, and **English**. Auto follows the browser's interface language; the choice is stored locally and shared by the toolbar menu and independent windows. Labels, live audio readouts, status messages, and error hints switch immediately without reapplying the YouTube theme.
+- The title-bar language selector supports **Auto / 自动**, **中文**, and **English**. Auto follows the browser's interface language; the choice is stored locally and shared by the in-page menu and independent windows. Labels, live audio readouts, status messages, and error hints switch immediately without reapplying the YouTube theme.
+- The **Menu theme** selector in the title bar offers **System theme**, **Light mode**, and **Dark mode**. System theme follows the device preference and responds to changes. Explicit choices persist locally and update all open menus, including the embedded dialog surface and independent windows. Search for “dark mode” or “菜单主题” to focus this selector. This menu-only preference does not change the YouTube page theme or uploaded wallpaper.
 - The **Backup** tab exports shared settings and all page configurations as JSON, with an option to include wallpapers and the custom icon. Import validates the file and replaces settings; a backup without media preserves existing media files. Backups support up to 150 MB.
-- Dropdown fields and their expanded lists use the Windows 98 palette, beveled borders, gray arrow buttons, and navy selection. They remain native select controls for keyboard and accessibility support.
-- The classic menu keeps its existing five tabs and control order. **Find** at the top searches settings in English or Chinese, including option names and aliases such as PiP, wallpaper, and Playables. Click a result to switch tabs, focus and highlight the setting. Search does not change values; disabled options lead to the related enable control. **Ctrl+F / Command+F** focuses search, arrow keys move through results, Enter selects, and Escape clears the query.
+- Dropdown fields and their expanded lists use rounded borders, subtle shadows and coral selection. They remain native select controls for keyboard and accessibility support. Category navigation supports arrow keys, Home and End.
+- The seven settings categories are **Appearance**, **Player**, **Records**, **Shortcuts**, **Audio**, **Layout**, and **Backup**. Small screens arrange navigation in a compact grid to keep labels readable. Search at the top finds settings in English or Chinese, including option names and aliases such as PiP, wallpaper, and Playables. Click a result to switch categories, focus and highlight the setting. Search does not change values; disabled options lead to the related enable control. **Ctrl+F / Command+F** focuses search, arrow keys move through results, Enter selects, and Escape clears the query.
+- The in-page menu uses one frosted-glass surface with a subtle view of the actual YouTube content or wallpaper. Header, sidebar, groups and footer share that surface, with simple separators instead of overlapping translucent cards. Controls, search results and dropdowns use solid surfaces for readable contrast in both modes. Theme changes apply immediately without leaving old highlights or restarting the page theme. Standalone windows use the matching light or dark canvas.
+- Connection upgrades preserve the open dialog and its authenticated iframe. Backdrop dismissal requires a click that starts outside the dialog, so finishing a slider drag outside does not close it. Range previews are combined once per animation frame, reuse unchanged media, and flush the final value on release or close. Focus reloads configuration only after stored values change.
+- The new coral play-and-slider icon appears in the browser toolbar, YouTube header and settings menu. `icons/logo-mark.svg` is the editable vector master; run `node scripts/build-icons.cjs` with Playwright available (or `PLAYWRIGHT_MODULE` set to its module path) to rebuild all PNG sizes.
 
 ## 🚀 Installation
 
@@ -79,11 +89,11 @@ YouTube Customizer is a Manifest V3 extension for Chromium-based browsers, inclu
 3. Turn on **Developer mode**.
 4. Select **Load unpacked**.
 5. Choose the project root folder containing `manifest.json`.
-6. Open YouTube. You can pin YouTube Customizer from the browser's Extensions menu for quick access.
+6. Open YouTube and find the YouTube Customizer button just to the left of your avatar.
 
 ## 🪄 Getting started
 
-1. Open YouTube and click the extension icon in the browser toolbar.
+1. Open YouTube and click the YouTube Customizer button beside your avatar to open the settings dialog on the page.
 2. In **Appearance**, enable **Enable page theme**, choose a theme, and adjust its colors, opacity, or blur.
 3. In **Wallpaper**, upload a background image, GIF, or MP4 video. In **Player**, customize the progress bar and scrubber.
 4. In **Audio**, enable volume boost and adjust the equalizer or stereo balance.
@@ -124,8 +134,8 @@ Opening or focusing the settings menu preserves the active theme and wallpaper. 
 
 | File / folder | Purpose |
 | --- | --- |
-| `assets/logo.png` | Original project logo |
-| `icons/` | Extension icons derived from the logo at 16, 32, 48, and 128 px |
+| `assets/logo.png` | Modern project logo |
+| `icons/` | Editable logo and UI SVGs, with extension PNGs at 16, 32, 48, and 128 px |
 | `manifest.json` | Extension metadata, icons, permissions, and content-script configuration |
 | `settings.js` | Default settings, validation, and theme presets |
 | `popup.html`, `popup.css`, `popup.js` | Extension settings popup |

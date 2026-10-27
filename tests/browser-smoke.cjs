@@ -57,9 +57,14 @@ const animatedGif = Buffer.from(
       }, { mime, base64, inputId });
     }
     async function waitForIcon(data) {
-      await player.waitForFunction(expected => {
+      await player.waitForFunction(async expected => {
         const button = document.querySelector(".ytp-scrubber-button");
-        return button && getComputedStyle(button).backgroundImage.includes(expected);
+        const url = button && /^url\("(blob:[^"]+)"\)$/.exec(getComputedStyle(button).backgroundImage)?.[1];
+        if (!url) return false;
+        const blob = await fetch(url).then(response => response.blob());
+        return await new Promise(resolve => {
+          const reader = new FileReader(); reader.onload = () => resolve(reader.result === expected); reader.readAsDataURL(blob);
+        });
       }, data);
       assert.equal(await player.evaluate(async expected => {
         const image = new Image();
@@ -75,7 +80,7 @@ const animatedGif = Buffer.from(
       (await chrome.storage.local.get("customIconData")).customIconData
     ), png);
 
-    // Reopening must re-send the stored custom image without requiring another upload.
+    // Reopening must keep the stored custom image without another upload.
     await popup.reload();
     await popup.waitForSelector("#settings-form:not([inert])");
     await popup.evaluate(async tabId => {

@@ -35,6 +35,9 @@
         const root = entry.attachShadow({ mode: 'open' });
         root.innerHTML = `<style>:host{all:initial}button{display:flex;align-items:center;justify-content:center;width:40px;height:40px;padding:6px;border:0;border-radius:50%;background:transparent;cursor:pointer;color:var(--yt-spec-text-primary,#fff)}button:hover,button[aria-expanded="true"]{background:var(--yt-spec-badge-chip-background,#8883)}button:focus-visible{outline:2px solid var(--yt-spec-call-to-action,#3ea6ff);outline-offset:-2px}img{width:28px;height:28px;object-fit:contain;pointer-events:none}</style><button type="button" aria-haspopup="dialog" aria-expanded="false"><img alt="" aria-hidden="true"></button>`;
         button = root.querySelector('button'); root.querySelector('img').src = chrome.runtime.getURL('icons/icon-32.png');
+        const buttonStyle = document.createElement('style');
+        buttonStyle.textContent = globalThis.YTCustomizerContent?.buildShadowButtonCss?.() || '';
+        root.append(buttonStyle);
         button.addEventListener('click', event => { event.stopPropagation(); toggle(); }); localize();
         for (const type of ['keydown', 'keyup']) root.addEventListener(type, event => event.stopPropagation());
       }

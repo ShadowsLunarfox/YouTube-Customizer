@@ -4,6 +4,9 @@
     version: SCRIPT_VERSION, defaults: DEFAULT_SETTINGS, assetDefaults,
     audioKeys, normalize, normalizeAssets, normalizeProfiles, normalizePageAssets, pageScope, resolveSettings, isSettingsPageUrl, iconDataUri
   } = YTCustomizer;
+  // An all-frame reconnect can include the extension's embedded settings view.
+  // Keep page theming, including the button skin, on YouTube documents only.
+  if (!YTCustomizer.isYouTubeUrl(location.href)) return;
   const runtime = globalThis.YTCustomizerContent;
   const isMusic = location.hostname === "music.youtube.com";
   if (!runtime?.createSurfaceController || !runtime?.createShortsController ||
@@ -346,6 +349,7 @@
     const theater = 'html[data-ytc-custom-background] :is(ytd-watch-flexy, ytd-watch-grid)[theater]:not([fullscreen])';
     const baseCss = `
       html[data-ytc-theme] {
+        --ytc-button-text: #fff;
         --ytc-ui-background: ${rgba(surface, "var(--ytc-ui-opacity)")} !important;
         --yt-spec-base-background: ${panel} !important;
         --yt-spec-raised-background: ${panel} !important;
@@ -550,20 +554,20 @@
       html[data-ytc-theme] yt-searchbox input::placeholder { color: ${muted} !important; }
       html[data-ytc-theme] :is(ytd-masthead, ytd-watch-metadata, ytd-comments)
         :is(.ytSpecButtonShapeNextTonal, .ytSpecButtonShapeNextText) {
-        color: ${text} !important;
+        color: var(--ytc-button-text) !important;
         background-color: ${controlFill} !important;
       }
       html[data-ytc-theme] :is(ytd-masthead, ytd-watch-metadata, ytd-comments)
-        .ytSpecButtonShapeNextOutline { color: ${accent} !important; border-color: ${rgba(text, 0.3)} !important; }
+        .ytSpecButtonShapeNextOutline { color: var(--ytc-button-text) !important; border-color: ${rgba(text, 0.3)} !important; }
       html[data-ytc-theme] :is(ytd-subscribe-button-renderer, ytd-grid-channel-renderer #subscribe)
         :is(.ytSpecButtonShapeNextHost, .ytSpecButtonShapeNextButtonTextContent) {
-        color: ${text} !important;
+        color: var(--ytc-button-text) !important;
       }
       html[data-ytc-theme] :is(ytd-watch-metadata #description a, ytd-comments #content-text a) { color: ${accent} !important; }
       html[data-ytc-theme] yt-chip-cloud-chip-renderer[selected] {
         --ytc-universal-glass: ${rgba(accent, "var(--ytc-ui-opacity)")} !important;
         background-color: ${rgba(accent, "var(--ytc-ui-opacity)")} !important;
-        color: ${text} !important;
+        color: var(--ytc-button-text) !important;
       }
 
       html[data-ytc-custom-background] ytd-watch-flexy :is(#cinematics, #cinematics-container,
@@ -1089,7 +1093,8 @@
       buildAppearanceCss(currentSettings, currentAssets) +
       (isMusic ? runtime.buildMusicCss(currentSettings) :
         (runtime.buildHomepageGlassCss?.() || "") + (runtime.buildSurfaceCss?.() || "") + buildLayoutCss(currentSettings) +
-        buildEffectsCss(currentSettings) + buildGridCss(currentSettings) + runtime.buildHomeShortsGridCss(currentSettings)) + buildCardLayoutCss(currentSettings);
+        buildEffectsCss(currentSettings) + buildGridCss(currentSettings) + runtime.buildHomeShortsGridCss(currentSettings)) + buildCardLayoutCss(currentSettings) +
+      (runtime.buildButtonCss?.() || '');
     if (styleEl.textContent !== css) styleEl.textContent = css;
     document.documentElement.toggleAttribute("data-ytc-reduced-effects", currentSettings.reduceAnimations);
     document.documentElement.toggleAttribute("data-ytc-disable-video-previews", currentSettings.disableVideoPreviews);

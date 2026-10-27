@@ -212,10 +212,10 @@
         color: ${secondary} !important;
       }
       ${theme} ytmusic-player-page #side-panel :is(tp-yt-paper-tab, [role="tab"]) {
-        color: ${secondary} !important;
+        color: var(--ytc-button-text, #fff) !important;
       }
       ${theme} ytmusic-player-page #side-panel :is(tp-yt-paper-tab, [role="tab"])[aria-selected="true"] {
-        color: ${primary} !important;
+        color: var(--ytc-button-text, #fff) !important;
       }
       ${theme} ytmusic-player-page tp-yt-paper-tabs {
         --paper-tabs-selection-bar-color: ${settings.accentColor} !important;
@@ -223,7 +223,7 @@
       ${theme} ytmusic-app :is(.ytSpecButtonShapeNextTonal, .ytSpecButtonShapeNextOutline,
         .ytSpecButtonShapeNextText, .yt-spec-button-shape-next--tonal,
         .yt-spec-button-shape-next--outline, .yt-spec-button-shape-next--text) {
-        color: ${primary} !important;
+        color: var(--ytc-button-text, #fff) !important;
       }
       ${theme} ytmusic-app :is(.ytSpecButtonShapeNextOutline, .yt-spec-button-shape-next--outline) {
         border-color: color-mix(in srgb, ${primary} 30%, transparent) !important;
@@ -238,7 +238,7 @@
       ${theme} ${carouselArrows} {
         background: var(--ytc-ui-background) !important;
         backdrop-filter: var(--ytc-ui-backdrop) !important;
-        color: ${primary} !important;
+        color: var(--ytc-button-text, #fff) !important;
         border: 1px solid color-mix(in srgb, ${primary} 35%, transparent) !important;
         border-radius: 12px !important;
         box-sizing: border-box !important;

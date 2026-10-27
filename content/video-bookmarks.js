@@ -70,6 +70,9 @@
       <label><span data-text="Timestamp"></span><input id="bookmark-time" type="text" inputmode="decimal" value="0:00" aria-label="Timestamp"></label><button type="button" data-action="now" data-text="Use current time"></button>
       <label class="note-label"><span data-text="Note (optional)"></span><textarea id="bookmark-note" maxlength="1000" aria-label="Note (optional)"></textarea></label><div class="actions"><button id="bookmark-save" type="submit"></button><button type="button" data-action="seek" data-text="Jump to bookmark"></button><button id="bookmark-delete" type="button" data-action="delete" data-text="Delete" hidden></button></div></form>
       <p id="bookmark-status" role="status" aria-live="polite"></p></section>`;
+      const buttonStyle = document.createElement('style');
+      buttonStyle.textContent = globalThis.YTCustomizerContent?.buildShadowButtonCss?.() || '';
+      root.append(buttonStyle);
       const timeRow = node('div', null, 'time-row');
       timeRow.append($('#bookmark-form > label'), $('[data-action="now"]')); $('#bookmark-form').prepend(timeRow);
       root.addEventListener('click', click);
@@ -190,6 +193,9 @@
           event.stopPropagation();
           if (event.target.id === 'bookmark-rail' && ['Enter', ' '].includes(event.key)) { event.preventDefault(); try { openNote(video.currentTime); } catch (error) { notice(error.message, true); } }
         });
+        const buttonStyle = document.createElement('style');
+        buttonStyle.textContent = globalThis.YTCustomizerContent?.buildShadowButtonCss?.() || '';
+        markerRoot.append(buttonStyle);
         markerRoot.addEventListener('click', event => {
           event.preventDefault(); event.stopPropagation();
           if (busy) return;
@@ -214,6 +220,7 @@
       for (const point of sorted()) {
         if (point.time > video.duration + .01) continue;
         const button = node('button', null, 'pin'); button.type = 'button'; button.dataset.id = point.id;
+        button.setAttribute('data-ytc-bookmark-pin', '');
         button.style.left = `clamp(6px,${Math.min(100, point.time / video.duration * 100)}%,calc(100% - 6px))`;
         button.title = format(point.time) + (point.note ? ' — ' + point.note : ''); button.setAttribute('aria-label', t('Open timeline note') + ' ' + button.title); button.setAttribute('aria-pressed', String(open && editing === point.id)); ticks.append(button);
       }

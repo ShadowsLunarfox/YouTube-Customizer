@@ -13,6 +13,30 @@
   const UNIVERSAL_GLASS_ATTR = "data-ytc-universal-glass";
   const UNIVERSAL_GLASS_CLEAR_ATTR = "data-ytc-universal-clear";
   const GLASS_BACKDROP = "var(--ytc-ui-backdrop)";
+  // Style the actual interactive surface once, rather than tinting both a
+  // legacy custom-element wrapper and the button it contains.
+  const BUTTON_ELEMENTS = 'button, input:is([type="button"], [type="submit"], [type="reset"]), ' +
+    'tp-yt-paper-button, tp-yt-paper-icon-button, yt-icon-button, tp-yt-paper-tab, ' +
+    '.ytSpecButtonShapeNextHost, .yt-spec-button-shape-next, .ytp-button, tp-yt-paper-item, ' +
+    'ytd-guide-entry-renderer, ytd-mini-guide-entry-renderer, ytd-menu-service-item-renderer, ' +
+    'ytd-menu-navigation-item-renderer, ytd-compact-link-renderer, ' +
+    ':is(ytd-menu-popup-renderer, ytd-multi-page-menu-renderer, yt-list-view-model, ' +
+      'ytmusic-menu-popup-renderer, ytmusic-multi-page-menu-renderer) yt-list-item-view-model, ' +
+    '[role="button"]:not([href^="/watch"], [href^="/shorts/"]), ' +
+    '[role="tab"], [role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]';
+  const BUTTON_MATCH_SELECTOR = `:is(${BUTTON_ELEMENTS})`;
+  const BUTTON_EXCLUSIONS = PLAYER_SCOPE_SELECTOR + ', .html5-video-container, video, img, canvas, iframe, ' +
+    '.ytp-scrubber-button, .ytp-progress-bar, .ytp-cued-thumbnail-overlay, [data-ytc-bookmark-pin], ' +
+    'ytd-thumbnail, yt-thumbnail-view-model, .ytThumbnailViewModelHost, ' +
+    '.ytLockupViewModelContentImage, .yt-lockup-view-model__content-image';
+  const BUTTON_SURFACE_SELECTOR = `${BUTTON_MATCH_SELECTOR}:not(:has(${BUTTON_MATCH_SELECTOR})):not(:where(${BUTTON_EXCLUSIONS}))`;
+  const BUTTON_WRAPPER_SELECTOR = `${BUTTON_MATCH_SELECTOR}:has(${BUTTON_MATCH_SELECTOR}):not(:where(${BUTTON_EXCLUSIONS}, ` +
+    'yt-chip-cloud-chip-renderer, .html5-video-player.ytp-delhi-modern.ytp-delhi-horizontal-volume-controls .ytp-volume-area, ' +
+    '.html5-video-player.ytp-delhi-modern .ytp-volume-popover, ' +
+    'ytmusic-carousel-shelf-renderer :is(#previous-items-button, #next-items-button)))';
+  const BUTTON_INNER_SELECTOR = ':is(yt-chip-cloud-chip-renderer, ' +
+    '.html5-video-player.ytp-delhi-modern.ytp-delhi-horizontal-volume-controls .ytp-volume-area, ' +
+    '.html5-video-player.ytp-delhi-modern .ytp-volume-popover) ' + BUTTON_SURFACE_SELECTOR;
   const MASTHEAD_BACKDROP_SELECTOR = "ytd-masthead > #background";
   // Frost the header's background sibling so autocomplete can still sample the page.
   // An iframe also needs its outer frame to sample the parent document's wallpaper.
@@ -151,6 +175,7 @@
     ':is(#background, #primary, #secondary, .playlist-header-background), ' +
     LIBRARY_HISTORY_CONTROLS_SELECTOR + ' > #contents';
   const UNIVERSAL_GLASS_TARGET_SELECTORS = [
+    BUTTON_SURFACE_SELECTOR,
     "ytd-masthead", "ytd-masthead #background", "ytd-masthead #masthead-container",
     "ytd-mini-guide-renderer", "ytd-guide-renderer", "ytd-guide-renderer #guide",
     "ytd-guide-renderer #guide-inner-content", "ytd-mini-guide-renderer #guide-content",
@@ -191,6 +216,7 @@
   ];
   const UNIVERSAL_GLASS_TARGET_SELECTOR = UNIVERSAL_GLASS_TARGET_SELECTORS.join(",");
   const UNIVERSAL_GLASS_CLEAR_SELECTORS = [
+    BUTTON_WRAPPER_SELECTOR, BUTTON_INNER_SELECTOR,
     "ytd-app #guide-content", "ytd-app.with-chipbar", "ytd-app #masthead-container", "ytd-app #frosted-glass",
     "ytd-masthead #center", "ytd-masthead #container", "ytd-masthead #background",
     "ytd-masthead #masthead-container", "ytd-masthead #search", "ytd-masthead yt-searchbox",
@@ -278,9 +304,9 @@
     // These tokens occur as ancestors in the volume-control selectors. The
     // player/video layout itself is never a glass surface; native resize writes
     // must not run the large contextual selectors on every animation frame.
-    if (element.matches(PLAYER_SCOPE_SELECTOR + ', .html5-video-container')) return false;
+    if (element.matches(PLAYER_SCOPE_SELECTOR + ', .html5-video-container, .ytp-progress-bar, .ytp-progress-list, .ytp-scrubber-button')) return false;
     if (GLASS_CANDIDATE_TAGS.has(element.localName) || GLASS_CANDIDATE_IDS.has(element.id) ||
-        element.getAttribute("role") === "dialog" || element.hasAttribute(UNIVERSAL_GLASS_ATTR) ||
+        ["dialog", "button", "tab", "menuitem", "menuitemradio", "menuitemcheckbox"].includes(element.getAttribute("role")) || element.hasAttribute(UNIVERSAL_GLASS_ATTR) ||
         element.hasAttribute(UNIVERSAL_GLASS_CLEAR_ATTR)) return true;
     for (const name of element.classList) if (GLASS_CANDIDATE_CLASSES.has(name)) return true;
     return false;
@@ -294,7 +320,7 @@
     ytd-menu-popup-renderer, ytd-multi-page-menu-renderer, yt-live-chat-renderer,
     ytd-engagement-panel-section-list-renderer > #content, ${SHORTS_PANEL_SELECTOR}, .ytp-popup,
     ${CHANNEL_PANEL_SELECTOR}, ${CHANNEL_CARD_SELECTOR}, ${CHANNEL_HEADER_SURFACE_SELECTOR},
-    ${DIALOG_SURFACE_SELECTOR}) :is(.ytSpecButtonShapeNextHost, yt-chip-cloud-chip-renderer,
+    ytd-rich-shelf-renderer, ${DIALOG_SURFACE_SELECTOR}) :is(${BUTTON_SURFACE_SELECTOR}, .ytSpecButtonShapeNextHost, yt-chip-cloud-chip-renderer,
     .ytChipShapeChip, ytd-guide-entry-renderer, ytd-mini-guide-entry-renderer),
     ${TOPICS_SHELF_SELECTOR} button,
     ${MEMBERSHIPS_SHELF_SELECTOR} :is(ytd-rich-item-renderer, yt-lockup-view-model, button),
@@ -313,7 +339,73 @@
     ${WATCH_FILTER_BAR_SELECTOR} :is(yt-chip-cloud-chip-renderer, .ytSpecButtonShapeNextHost)`;
   const HOMEPAGE_SCOPE_SELECTOR = 'ytd-browse[page-subtype="home"]';
   const LIVE_CHAT_SHADOW_STYLE_ATTR = "data-ytc-live-chat-surface";
-  const LIVE_CHAT_SHADOW_CSS = `
+  function buildButtonCss(scope = 'html[data-ytc-theme] body') {
+    return `
+      ${scope} :is(${BUTTON_ELEMENTS}, yt-chip-cloud-chip-renderer) {
+        --yt-spec-text-primary: #fff;
+        --yt-spec-text-secondary: #fff;
+        --yt-spec-icon-active-other: #fff;
+        --yt-spec-icon-inactive: #fff;
+        --iron-icon-fill-color: #fff;
+        --paper-button-ink-color: #fff;
+        color: var(--ytc-button-text, #fff) !important;
+      }
+      ${scope} :is(${BUTTON_ELEMENTS}, yt-chip-cloud-chip-renderer)
+        :where(a, span, div, yt-formatted-string, yt-icon, svg, #text) {
+        color: var(--ytc-button-text, #fff) !important;
+      }
+      ${scope} :is(${BUTTON_ELEMENTS}) svg { fill: currentColor !important; }
+      ${scope} ${BUTTON_SURFACE_SELECTOR} {
+        background: var(--ytc-universal-glass, var(--ytc-ui-background)) !important;
+        background-image: none !important;
+        -webkit-backdrop-filter: ${GLASS_BACKDROP} !important;
+        backdrop-filter: ${GLASS_BACKDROP} !important;
+      }
+      ${scope} ${BUTTON_SURFACE_SELECTOR}:hover:not(:disabled, [disabled], [aria-disabled="true"]) {
+        outline: 1px solid rgb(255 255 255 / 40%);
+        outline-offset: -2px;
+      }
+      ${scope} ${BUTTON_SURFACE_SELECTOR}:is(:disabled, [disabled], [aria-disabled="true"]) {
+        opacity: .5;
+      }
+      ${scope} :is(${BUTTON_WRAPPER_SELECTOR}, ${BUTTON_INNER_SELECTOR}) {
+        background: transparent !important;
+        background-image: none !important;
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+      }
+      ${scope} :is(${BUTTON_ELEMENTS}):focus-visible {
+        outline: 2px solid #fff !important;
+        outline-offset: -2px;
+      }
+      ${scope} :is(${BUTTON_ELEMENTS})[aria-pressed="true"] {
+        outline: 1px solid var(--yt-spec-call-to-action, #fff);
+        outline-offset: -2px;
+      }
+      /* Music paints a capsule around carousel arrows; its child button shares
+         that surface, as do controls in already-frosted Music cards/panels. */
+      ${scope} ytmusic-carousel-shelf-renderer :is(#previous-items-button, #next-items-button) ${BUTTON_SURFACE_SELECTOR} {
+        background: transparent !important;
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+      }
+      ${scope} :is(ytmusic-nav-bar, ytmusic-player-bar, ytmusic-two-row-item-renderer,
+        ytmusic-responsive-list-item-renderer, ytmusic-menu-popup-renderer,
+        ytmusic-multi-page-menu-renderer, ytmusic-popup-container tp-yt-paper-dialog,
+        ytmusic-responsive-header-renderer, ytmusic-detail-header-renderer,
+        ytmusic-player-page #side-panel) ${BUTTON_SURFACE_SELECTOR} {
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+      }
+    `;
+  }
+  runtime.buildButtonCss = () => buildButtonCss();
+  runtime.buildShadowButtonCss = () => buildButtonCss(':host-context(html[data-ytc-theme])');
+  const LIVE_CHAT_SHADOW_CSS = buildButtonCss(':host-context(html[data-ytc-theme])') + `
+    :host-context(html[data-ytc-theme]) ${BUTTON_SURFACE_SELECTOR} {
+      -webkit-backdrop-filter: none !important;
+      backdrop-filter: none !important;
+    }
     :host-context(html[data-ytc-theme]) :is(#contents, #chat-messages, #item-scroller, #items, #panel-pages, #header,
     #input-panel, #input, #action-panel, yt-live-chat-header-renderer,
     yt-live-chat-message-input-renderer, yt-live-chat-item-list-renderer,
@@ -414,6 +506,9 @@
       forceStyle(store, element, "background", color);
       forceStyle(store, element, "box-shadow", "none");
       forceStyle(store, element, "backdrop-filter", backdrop);
+      if (element.matches(BUTTON_MATCH_SELECTOR)) {
+        forceStyle(store, element, 'color', 'var(--ytc-button-text, #fff)');
+      }
       if (element.matches(MASTHEAD_BACKDROP_SELECTOR)) {
         // YouTube hides this layer on chip-bar and watch pages; keep the shared blur visible.
         forceStyle(store, element, "display", "block");
@@ -532,6 +627,12 @@
 
     function updateGlassElement(element) {
       if (!element.isConnected) return;
+      // Legacy controls can insert their real button inside another container
+      // after the wrapper was styled. Reconcile those ancestors as well.
+      if (element.matches(BUTTON_MATCH_SELECTOR)) {
+        const wrapper = element.parentElement?.closest(BUTTON_MATCH_SELECTOR);
+        if (wrapper) updateGlassElement(wrapper);
+      }
       if (element.matches(UNIVERSAL_GLASS_CLEAR_SELECTOR)) {
         forceSurface(glassStyles, element, "transparent", [UNIVERSAL_GLASS_CLEAR_ATTR]);
       } else if (element.matches(UNIVERSAL_GLASS_TARGET_SELECTOR)) {
@@ -679,6 +780,7 @@
           // Text updates cannot introduce a new glass surface.
           if (!changedElements) continue;
           if (glassEnabled()) {
+            if (glassStyles.has(target)) glassElements.add(target);
             // Adding/removing the background sibling changes which node owns the header blur.
             if (target.matches("ytd-masthead")) glassElements.add(target);
             // This ancestor's :has(#chips-wrapper) rule depends on added and removed children.
@@ -1463,8 +1565,8 @@
       backdrop-filter: none !important;
       filter: none !important;
     }
-    html[data-ytc-theme] :is(${UNIVERSAL_GLASS_TARGET_SELECTOR}, ${UNIVERSAL_GLASS_CLEAR_SELECTOR})::before,
-    html[data-ytc-theme] :is(${UNIVERSAL_GLASS_TARGET_SELECTOR}, ${UNIVERSAL_GLASS_CLEAR_SELECTOR})::after {
+    html[data-ytc-theme] :is(${UNIVERSAL_GLASS_TARGET_SELECTOR}, ${UNIVERSAL_GLASS_CLEAR_SELECTOR}):not(:is(${BUTTON_ELEMENTS}))::before,
+    html[data-ytc-theme] :is(${UNIVERSAL_GLASS_TARGET_SELECTOR}, ${UNIVERSAL_GLASS_CLEAR_SELECTOR}):not(:is(${BUTTON_ELEMENTS}))::after {
       background: transparent !important;
       box-shadow: none !important;
       backdrop-filter: none !important;

@@ -152,7 +152,7 @@ const chatFixture = `<!doctype html><html><head><style>
     assert.equal(await page.locator("#notifications-popup > #header").evaluate(el => getComputedStyle(el).backdropFilter), "none");
     assert.equal(await page.locator("#frosted-glass").evaluate(el => getComputedStyle(el, "::before").backgroundImage), "none");
     assert.equal(await page.locator("#frosted-glass").evaluate(el => getComputedStyle(el, "::before").backdropFilter), "none");
-    assert.equal(await page.locator("yt-chip-cloud-chip-renderer[selected]").evaluate(el => getComputedStyle(el).color), "rgb(241, 241, 241)");
+    assert.equal(await page.locator("yt-chip-cloud-chip-renderer[selected]").evaluate(el => getComputedStyle(el).color), "rgb(255, 255, 255)");
     assert.equal(await chat.locator("html").evaluate(el => getComputedStyle(el).backgroundImage), "none");
     assert.equal(await chat.evaluate(() => getComputedStyle(document.querySelector("yt-live-chat-renderer").shadowRoot.querySelector("#contents")).backgroundColor), "rgba(0, 0, 0, 0)");
 

@@ -261,10 +261,11 @@ const fixture = `<!doctype html><html><head><style>
       const [tab] = await chrome.tabs.query({url:'https://music.youtube.com/*'});
       await chrome.scripting.executeScript({target:{tabId:tab.id},func:() => {
         globalThis.musicWork = {queries:0,selectorChecks:0};
+        globalThis.musicQueryLog = [];
         for (const prototype of [Document.prototype,Element.prototype]) {
           for (const method of ['querySelector','querySelectorAll']) {
             const original = prototype[method];
-            prototype[method] = function(...args) { musicWork.queries++;return original.apply(this,args); };
+            prototype[method] = function(...args) { musicWork.queries++;if(musicQueryLog.length<20)musicQueryLog.push(args[0]);return original.apply(this,args); };
           }
         }
         const matches = Element.prototype.matches;
@@ -283,15 +284,21 @@ const fixture = `<!doctype html><html><head><style>
         await new Promise(requestAnimationFrame);
       }
     });
+    const readMusicWork = () => popup.evaluate(async () => {
+      const [tab] = await chrome.tabs.query({url:'https://music.youtube.com/*'});
+      const [{result}] = await chrome.scripting.executeScript({target:{tabId:tab.id},func:() => ({...musicWork,selectors:musicQueryLog})});return result;
+    });
+    const playbackWork = await readMusicWork();
+    assert.equal(playbackWork.queries,0,'progress and queue animation never query the DOM');
+    assert.equal(playbackWork.selectorChecks,0,'progress and queue animation never inspect glass surfaces');
     await page.locator('#home').click();
     await page.locator('#next').click();
     assert.equal(await page.evaluate(() => window.nextClicks),1);
     await page.waitForTimeout(150);
-    const work = await popup.evaluate(async () => {
-      const [tab] = await chrome.tabs.query({url:'https://music.youtube.com/*'});
-      const [{result}] = await chrome.scripting.executeScript({target:{tabId:tab.id},func:() => musicWork});return result;
-    });
-    assert.deepEqual(work,{queries:0,selectorChecks:0},'progress, queue, and SPA navigation do no extension DOM scanning');
+    const work = await readMusicWork();
+    assert.equal(work.selectorChecks,0,'SPA navigation never inspects glass surfaces');
+    assert.ok(work.queries<20&&work.selectors.every(selector=>!/shelf|queue|progress|data-ytc-universal/.test(selector)),
+      'SPA navigation only refreshes a few existing tool/header anchors: '+JSON.stringify(work));
     assert.equal(await page.evaluate(() => window.primaryVideo === document.querySelector('video') && !primaryVideo.paused && primaryVideo.currentTime > 0),true);
     assert.ok(await page.locator('video').evaluate((el,time) => el.currentTime > time,initialTime));
     await page.locator('#play-pause').click();assert.equal(await page.locator('video').evaluate(el => el.paused),true);
@@ -300,10 +307,10 @@ const fixture = `<!doctype html><html><head><style>
     assert.deepEqual(await background('ytmusic-two-row-item-renderer'),{color:'rgba(255, 255, 255, 0.7)',blur:'blur(12px)'});
     assert.deepEqual(await background('ytmusic-carousel-shelf-renderer'),{color:'rgba(0, 0, 0, 0)',blur:'none'});
     assert.notEqual(await page.locator('.subtitle a').first().evaluate(el => getComputedStyle(el).color),'rgb(255, 255, 255)','native white captions adopt the light theme');
-    assert.equal(await page.locator('[role="tab"]').evaluate(el => getComputedStyle(el).color),'rgb(17, 34, 51)','selected queue tab stays readable');
+    assert.equal(await page.locator('[role="tab"]').evaluate(el => getComputedStyle(el).color),'rgb(255, 255, 255)','selected queue tab keeps the shared white button text');
     assert.notEqual(await page.locator('.duration').evaluate(el => getComputedStyle(el).color),'rgb(255, 255, 255)','queue timestamps adopt the light theme');
-    assert.equal(await page.locator('ytmusic-visual-header-renderer .buttons button').last().evaluate(el=>getComputedStyle(el).color),'rgb(17, 34, 51)',
-      'filled native channel actions adopt readable theme text with their themed background');
+    assert.equal(await page.locator('ytmusic-visual-header-renderer .buttons button').last().evaluate(el=>getComputedStyle(el).color),'rgb(255, 255, 255)',
+      'filled native channel actions keep white text with their glass background');
     await page.locator('ytmusic-app-layout').evaluate(el => el.setAttribute('player-page-open',''));
     assert.equal(await page.locator('#content').evaluate(el => getComputedStyle(el).visibility),'hidden','browse cards do not bleed through the expanded player');
     assert.equal(await page.locator('ytmusic-player-page').evaluate(el => getComputedStyle(el).visibility),'visible');

@@ -26,6 +26,7 @@
 
 - Choose the **Charcoal**, **Light**, **Forest**, or **Windows Classic** theme, or set your own page, surface, text, and accent colors.
 - Adjust UI opacity from 0–100% and frosted-glass blur from 0–30 px.
+- Buttons on YouTube pages keep white labels over translucent glass, including player controls, menus, filters and timeline-note actions. Opacity and blur follow the page settings; buttons in frosted panels share the panel's blur. The settings menu keeps its separate light/dark design.
 - Upload a background image, GIF, or MP4 video up to 20 MB, choose Fill or Fit, and adjust its opacity. Images can also be tiled. MP4 videos loop silently.
 - YouTube ambient lighting is suppressed while a custom background is active.
 - In theater mode (T), the empty space around the video reveals your wallpaper with the current UI blur setting.

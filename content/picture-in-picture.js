@@ -63,7 +63,8 @@
     const structural = '.html5-video-player, .ytp-chrome-bottom, .ytp-chrome-controls, .ytp-right-controls, .ytp-right-controls-left';
     const owned = 'data-ytc-pip-owned';
     const entries = new Map();
-    let disposed = false, frame = 0;
+    let disposed = false, frame = 0, language = 'auto';
+    const t = text => YTCustomizerI18n.translate(text, language);
     const style = document.createElement('style');
     style.setAttribute(owned, '');
     style.textContent = `
@@ -93,7 +94,7 @@
       const pip = document.pictureInPictureElement;
       for (const [player, entry] of entries) {
         const active = Boolean(pip && player.contains(pip));
-        const label = active ? 'Exit picture-in-picture' : 'Picture-in-picture';
+        const label = t(active ? 'Exit picture-in-picture' : 'Picture-in-picture');
         if (entry.button.getAttribute('aria-pressed') !== String(active)) entry.button.setAttribute('aria-pressed', String(active));
         if (entry.button.title !== label) {
           entry.button.title = label;
@@ -101,6 +102,7 @@
           entry.button.setAttribute('data-title-no-tooltip', label);
           entry.button.setAttribute('data-tooltip-title', label);
         }
+        if (entry.errorSource) entry.status.textContent = t(entry.errorSource);
       }
     }
 
@@ -148,12 +150,14 @@
             event.stopPropagation();
             if (entry.busy || disposed) return;
             entry.busy = button.disabled = true;
+            entry.errorSource = '';
             status.hidden = true;
             try {
               const result = await execute('toggle', player);
               if (!disposed && player.isConnected && result.error) {
                 clearTimeout(entry.timer);
-                status.textContent = result.error;
+                entry.errorSource = result.error;
+                status.textContent = t(result.error);
                 status.hidden = false;
                 entry.timer = setTimeout(() => { status.hidden = true; }, 4500);
               }
@@ -197,6 +201,15 @@
     for (const type of events) document.addEventListener(type, schedule);
     for (const type of ['enterpictureinpicture', 'leavepictureinpicture']) document.addEventListener(type, updateState, true);
     window.addEventListener('popstate', schedule);
+    function onLanguage(changes, area) {
+      if (area === 'local' && changes.menuLanguage) {
+        language = changes.menuLanguage.newValue || 'auto'; updateState();
+      }
+    }
+    chrome.storage.onChanged.addListener(onLanguage);
+    void chrome.storage.local.get({ menuLanguage: 'auto' }).then(value => {
+      if (!disposed) { language = value.menuLanguage; updateState(); }
+    }).catch(() => {});
     mount();
     return { handleMutations, dispose() {
       disposed = true;
@@ -204,6 +217,7 @@
       for (const type of events) document.removeEventListener(type, schedule);
       for (const type of ['enterpictureinpicture', 'leavepictureinpicture']) document.removeEventListener(type, updateState, true);
       window.removeEventListener('popstate', schedule);
+      YTCustomizer.removeExtensionListener(chrome.storage.onChanged, onLanguage);
       for (const entry of entries.values()) remove(entry);
       entries.clear();
       style.remove();

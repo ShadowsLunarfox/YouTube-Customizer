@@ -154,6 +154,8 @@
     let problem = '';
     let meter = null;
     let meterTimer;
+    let cleanupTimer = 0;
+    let mediaRefreshPending = false;
 
     function stopMeter() {
       clearTimeout(meterTimer);
@@ -234,6 +236,7 @@
         document[method]('pointerdown', onGesture, true);
         document[method]('keydown', onGesture, true);
         document[method]('yt-navigate-finish', refresh);
+        document[method]('leavepictureinpicture', scheduleCleanup, true);
       }
       if (resources.context && contextListener !== needed) {
         resources.context[needed ? 'addEventListener' : 'removeEventListener']('statechange', onContextState);
@@ -283,7 +286,8 @@
 
     function pruneDetached() {
       for (const graph of resources.connected) {
-        if (!graph.video.isConnected && graph.video.paused) {
+        if (!graph.video.isConnected && graph.video !== document.pictureInPictureElement) {
+          if (meter?.graph === graph) stopMeter();
           graph.source.disconnect();
           if (graph.output) graph.output.disconnect();
           else {
@@ -294,6 +298,35 @@
           resources.connected.delete(graph);
         }
       }
+    }
+
+    function scheduleCleanup() {
+      if (disposed || cleanupTimer) return;
+      cleanupTimer = setTimeout(() => {
+        cleanupTimer = 0;
+        const refreshMedia = mediaRefreshPending;
+        mediaRefreshPending = false;
+        pruneDetached();
+        if (refreshMedia) refresh();
+        else attachListeners();
+      }, 0);
+    }
+
+    function handleMutations(records) {
+      if (disposed || !settings?.audioEnabled && !resources.connected.size) return;
+      let removed = false;
+      for (const record of records) {
+        if (record.type !== 'childList') continue;
+        removed ||= record.removedNodes.length > 0;
+        // Only media structure changes need discovery. Timeline, style and
+        // ordinary control updates must never rebuild or rescan audio graphs.
+        if (!mediaRefreshPending && [...record.addedNodes].some(node => node instanceof Element &&
+            (node.localName === 'video' || node.childElementCount && node.querySelector('video')))) {
+          mediaRefreshPending = true;
+        }
+      }
+      if (mediaRefreshPending || removed && [...resources.connected].some(graph =>
+          !graph.video.isConnected && graph.video !== document.pictureInPictureElement)) scheduleCleanup();
     }
 
     function refresh() {
@@ -340,14 +373,16 @@
     function dispose() {
       if (disposed) return;
       disposed = true;
+      clearTimeout(cleanupTimer);
       stopMeter();
+      pruneDetached();
       resources.connected.forEach(bypass);
       attachListeners();
       // Closing a context cannot undo createMediaElementSource and would mute the video.
       // The unity-gain bypass keeps normal sound on disable/reinjection.
     }
 
-    return Object.freeze({ sync, refresh, dispose, measure, get status() { return status(); } });
+    return Object.freeze({ sync, refresh, handleMutations, dispose, measure, get status() { return status(); } });
   }
 
   runtime.createAudioController = createAudioController;

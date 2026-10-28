@@ -14,6 +14,10 @@
 
 > Customize YouTube's appearance, player, and layout. Changes are previewed on the current YouTube tab as you adjust the settings.
 
+Long sessions release retired feed surfaces and removed player audio graphs. Background tabs discard obsolete visual update queues and reconcile the current page on return; video wallpapers pause while hidden and reuse their existing media and Blob URL on resume.
+
+Old page callbacks handle an extension reload without uncaught context errors. Automatic language detection caches the browser language and falls back to the page's browser language if extension APIs are unavailable. Refresh existing YouTube tabs after reloading the extension to load the new runtime.
+
 ## ✨ Features at a glance
 
 | Section | What you can customize |
@@ -38,6 +42,7 @@
 - The dedicated **Records** tab groups **Video bookmarks** and **Timeline record statistics**. Statistics show the number of locally recorded videos, total timeline points and points containing a written sticky note. They also show the current video's record count, with an optional list sorted by time. Saved and deleted records update these read-only totals automatically; an independent settings window stays bound to its original video tab as it navigates. Empty and malformed records are excluded. Statistics load only while Records is open and avoid loading stored wallpapers where the browser supports key-only storage enumeration. Search for “statistics” or “统计” to reach the section. Resetting the Records tab restores its display preference and preserves saved records.
 - In **Player → Picture-in-picture**, click **Open floating video** to open the current video in a native floating window. Click **Return video to tab** to close it. Both the in-page menu and separate settings window support this action; wallpapers and thumbnail previews are excluded, and playback position, volume, and mute are preserved.
 - A Picture-in-picture icon also appears at the left edge of the player's right-hand controls, before CC/settings, so you can open or close the floating video without opening the extension menu. It follows the native controls in theater/fullscreen mode and returns when YouTube rebuilds its player controls.
+- Fullscreen entry and exit use YouTube's native behavior. The extension does not change the browser window's size or state. F and Escape also reach the player from the extension entry and timeline-marker buttons; typing in notes and search fields stays unchanged.
 - Customize progress and buffered-segment colors, progress-bar thickness, and scrubber size.
 - Choose a separate color for the **Most replayed** heatmap, including its gradient and outline.
 - Choose a solid color, pulsing glow, moving shimmer, or cycling rainbow effect.
@@ -72,14 +77,14 @@
 - Use **Editing settings for** to edit shared settings or separate appearance and layout for **YouTube Home**, **Watch pages / Shorts**, and **YouTube Music**. Editing a page creates its override; turn off **Use separate appearance and layout** to return to shared settings. Player and Audio settings are shared.
 - Each page can have its own wallpaper. Page configurations and uploaded media are stored locally; shared settings continue to use browser sync storage.
 - Click **Open window** in the menu title bar to move the entire settings menu into a separate, resizable browser window. It keeps your selected settings tab and page configuration, previews on the originating YouTube tab, and remains open while you browse. Clicking Open window again reuses the existing window.
-- The title-bar language selector supports **Auto / 自动**, **中文**, and **English**. Auto follows the browser's interface language; the choice is stored locally and shared by the in-page menu and independent windows. Labels, live audio readouts, status messages, and error hints switch immediately without reapplying the YouTube theme.
+- The title-bar language selector supports **English**, **简体中文**, **繁體中文**, **廣東話**, **日本語**, **한국어**, **ไทย**, **Bahasa Melayu (Malaysia)**, and **Bahasa Indonesia**. **Auto / 自动** follows the browser's interface language, including Chinese script and region distinctions. The choice is stored locally and shared by the in-page menu and independent windows. Labels, live audio readouts, status messages, error hints, timeline-note controls, and the player PiP button switch immediately without reapplying the YouTube theme or translating saved user notes.
 - The **Menu theme** selector in the title bar offers **System theme**, **Light mode**, and **Dark mode**. System theme follows the device preference and responds to changes. Explicit choices persist locally and update all open menus, including the embedded dialog surface and independent windows. Search for “dark mode” or “菜单主题” to focus this selector. This menu-only preference does not change the YouTube page theme or uploaded wallpaper.
 - The **Backup** tab exports shared settings and all page configurations as JSON, with an option to include wallpapers and the custom icon. Import validates the file and replaces settings; a backup without media preserves existing media files. Backups support up to 150 MB.
 - Dropdown fields and their expanded lists use rounded borders, subtle shadows and coral selection. They remain native select controls for keyboard and accessibility support. Category navigation supports arrow keys, Home and End.
-- The seven settings categories are **Appearance**, **Player**, **Records**, **Shortcuts**, **Audio**, **Layout**, and **Backup**. Small screens arrange navigation in a compact grid to keep labels readable. Search at the top finds settings in English or Chinese, including option names and aliases such as PiP, wallpaper, and Playables. Click a result to switch categories, focus and highlight the setting. Search does not change values; disabled options lead to the related enable control. **Ctrl+F / Command+F** focuses search, arrow keys move through results, Enter selects, and Escape clears the query.
+- The seven settings categories are **Appearance**, **Player**, **Records**, **Shortcuts**, **Audio**, **Layout**, and **Backup**. Small screens arrange navigation in a compact grid to keep labels readable. Search at the top finds settings in every supported menu language, including option names and aliases such as PiP, wallpaper, and Playables. Click a result to switch categories, focus and highlight the setting. Search does not change values; disabled options lead to the related enable control. **Ctrl+F / Command+F** focuses search, arrow keys move through results, Enter selects, and Escape clears the query.
 - The in-page menu uses one frosted-glass surface with a subtle view of the actual YouTube content or wallpaper. Header, sidebar, groups and footer share that surface, with simple separators instead of overlapping translucent cards. Controls, search results and dropdowns use solid surfaces for readable contrast in both modes. Theme changes apply immediately without leaving old highlights or restarting the page theme. Standalone windows use the matching light or dark canvas.
 - Connection upgrades preserve the open dialog and its authenticated iframe. Backdrop dismissal requires a click that starts outside the dialog, so finishing a slider drag outside does not close it. Range previews are combined once per animation frame, reuse unchanged media, and flush the final value on release or close. Focus reloads configuration only after stored values change.
-- The new coral play-and-slider icon appears in the browser toolbar, YouTube header and settings menu. `icons/logo-mark.svg` is the editable vector master; run `node scripts/build-icons.cjs` with Playwright available (or `PLAYWRIGHT_MODULE` set to its module path) to rebuild all PNG sizes.
+- The coral play-and-slider icon appears in the browser toolbar, YouTube header and settings menu. The header uses an inline SVG, so it needs no cross-origin image request and remains visible after an extension reload. `icons/logo-mark.svg` is the editable vector master; run `node scripts/build-icons.cjs` with Playwright available (or `PLAYWRIGHT_MODULE` set to its module path) to rebuild PNGs and the inline mark. `--entry-only` updates just the inline mark without launching a browser.
 
 ## 🚀 Installation
 
@@ -140,7 +145,7 @@ Opening or focusing the settings menu preserves the active theme and wallpaper. 
 | `manifest.json` | Extension metadata, icons, permissions, and content-script configuration |
 | `settings.js` | Default settings, validation, and theme presets |
 | `popup.html`, `popup.css`, `popup.js` | Extension settings popup |
-| `i18n.js` | Chinese/English menu copy, local language preference, and dynamic text translation |
+| `i18n.js` | Nine local menu-language catalogs, script/region detection, language preference, and dynamic text translation |
 | `settings-search.js` | Bilingual search and navigation through the existing settings form |
 | `service-worker.js` | Browser shortcut actions, typing guards, and brief action feedback |
 | `yt.js`, `content/` | YouTube page styling and feature controllers |

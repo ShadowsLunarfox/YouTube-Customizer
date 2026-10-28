@@ -7,6 +7,7 @@
   // An all-frame reconnect can include the extension's embedded settings view.
   // Keep page theming, including the button skin, on YouTube documents only.
   if (!YTCustomizer.isYouTubeUrl(location.href)) return;
+  if (!YTCustomizer.hasExtensionContext()) return;
   const runtime = globalThis.YTCustomizerContent;
   const isMusic = location.hostname === "music.youtube.com";
   if (!runtime?.createSurfaceController || !runtime?.createShortsController ||
@@ -38,7 +39,8 @@
     if (globalThis[INSTANCE_KEY] && !globalThis[INSTANCE_KEY].disposed) return;
     initialAssets = { ...assetDefaults, pageProfiles: {}, pageAssets: {} };
     initialSettings = DEFAULT_SETTINGS;
-  } finally { chrome.storage.onChanged.removeListener(trackLoadingChanges); }
+  } finally { YTCustomizer.removeExtensionListener(chrome.storage.onChanged, trackLoadingChanges); }
+  if (!YTCustomizer.hasExtensionContext()) return;
   if (runtime.contentLoadToken !== loadToken) return;
   const active = globalThis[INSTANCE_KEY];
   if (active?.version === SCRIPT_VERSION && !active.disposed) return;
@@ -1024,6 +1026,7 @@
   const audio = runtime.createAudioController();
   const pipButtons = globalThis.YTCustomizerPictureInPicture?.createController();
   let inPageSettings = settingsController || globalThis.YTCustomizerInPageSettings?.createController();
+  if (settingsController) globalThis.YTCustomizerInPageSettings?.upgradeEntryIcons?.();
   const videoBookmarks = globalThis.YTCustomizerVideoBookmarks?.createController();
   const defaultShortcuts = globalThis.YTCustomizerDefaultShortcuts?.createController();
 
@@ -1212,6 +1215,7 @@
     pipButtons?.handleMutations(records);
     inPageSettings?.handleMutations(records);
     videoBookmarks?.handleMutations(records);
+    audio.handleMutations(records);
     if (isMusic) return;
     if (records.some(record => {
       if (record.type !== "childList") return false;
@@ -1297,8 +1301,8 @@
       removeBackgroundVideo();
       if (customIconUrl) URL.revokeObjectURL(customIconUrl);
       customIconData = customIconUrl = '';
-      chrome.storage.onChanged.removeListener(onStorageChanged);
-      chrome.runtime.onMessage.removeListener(onMessage);
+      YTCustomizer.removeExtensionListener(chrome.storage.onChanged, onStorageChanged);
+      YTCustomizer.removeExtensionListener(chrome.runtime.onMessage, onMessage);
       PREVIEW_MEDIA_EVENTS.forEach(event => document.removeEventListener(event, stopThumbnailPreview, true));
       document.documentElement.removeAttribute("data-ytc-theme");
       document.documentElement.removeAttribute("data-ytc-blur");

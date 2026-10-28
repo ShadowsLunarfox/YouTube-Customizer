@@ -21,7 +21,7 @@
         try { await chrome.storage.local.set({ menuTheme: preference }); }
         catch (error) { if (!disposed && revision === token) { preference = previous; apply(); } throw error; }
       },
-      dispose() { disposed = true; chrome.storage.onChanged.removeListener(stored); system.removeEventListener('change', apply); }
+      dispose() { disposed = true; YTCustomizer.removeExtensionListener(chrome.storage.onChanged, stored); system.removeEventListener('change', apply); }
     };
   }
   globalThis.YTCustomizerMenuTheme = { normalize, observe };

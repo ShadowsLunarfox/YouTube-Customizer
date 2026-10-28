@@ -605,7 +605,7 @@ async function connectToCurrentTab() {
   if (response?.version !== SCRIPT_VERSION) {
     await chrome.scripting.executeScript({
       target: { tabId: tab.id, allFrames: true },
-      files: ["settings.js", "i18n.js", "menu-theme.js", "content/surface-controller.js", "content/shorts-controller.js", "content/homepage-glass.js", "content/home-shorts-grid.js", "content/audio-controller.js", "content/music-theme.js", "content/picture-in-picture.js", "content/in-page-settings.js", "content/video-bookmarks.js", "content/default-shortcuts.js", "yt.js"]
+      files: chrome.runtime.getManifest().content_scripts[0].js
     });
     response = await ping();
   }

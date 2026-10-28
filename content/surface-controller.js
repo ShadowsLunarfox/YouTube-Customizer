@@ -436,6 +436,7 @@
     let fullGlassScanPending = false;
     let fullChatScanPending = false;
     let removedGlassNodes = false;
+    let backgroundDirty = false;
     const ambientRoots = new Set();
     const chatRoots = new Set();
     const glassRoots = new Set();
@@ -490,6 +491,33 @@
           attributes.forEach(attribute => element.removeAttribute(attribute));
         }
       }
+    }
+
+    function pruneDetachedSurfaces() {
+      for (const [element] of glassStyles) {
+        if (element.isConnected) continue;
+        restoreElement(glassStyles, element);
+        element.removeAttribute(UNIVERSAL_GLASS_ATTR);
+        element.removeAttribute(UNIVERSAL_GLASS_CLEAR_ATTR);
+      }
+      // Homepage fallback surfaces are separate from universal glass. Retaining
+      // their original styles used to keep every retired feed subtree alive.
+      for (const [element] of homepageStyles) {
+        if (!element.isConnected) restoreElement(homepageStyles, element);
+      }
+    }
+
+    function suspendVisualUpdates() {
+      backgroundDirty = true;
+      clearTimeout(ambientTimer);
+      clearTimeout(glassTimer);
+      clearTimeout(chatTimer);
+      clearTimeout(homepageTimer);
+      ambientTimer = glassTimer = chatTimer = homepageTimer = 0;
+      ambientRoots.clear(); chatRoots.clear(); glassRoots.clear(); glassElements.clear();
+      // Remember work, not historical DOM nodes. Background timers can be
+      // throttled for minutes; on return only the current document matters.
+      fullGlassScanPending = fullChatScanPending = true;
     }
 
     function surfaceBackdrop(element, color) {
@@ -569,6 +597,7 @@
 
     function scheduleAmbientBlocker(root) {
       if (!customBackgroundEnabled()) return;
+      if (document.hidden) { suspendVisualUpdates(); return; }
       ambientRoots.add(root);
       if (ambientTimer) return;
       ambientTimer = setTimeout(syncAmbientBlocker, 120);
@@ -577,6 +606,7 @@
     function syncUniversalGlass() {
       glassTimer = 0;
       if (disposed) return;
+      if (document.hidden) { suspendVisualUpdates(); return; }
       const fullScan = fullGlassScanPending;
       const roots = new Set(glassRoots);
       const elements = new Set(glassElements);
@@ -590,14 +620,7 @@
         return;
       }
       if (!fullScan) {
-        if (pruneRemoved) {
-          for (const [element] of glassStyles) {
-            if (element.isConnected) continue;
-            restoreElement(glassStyles, element);
-            element.removeAttribute(UNIVERSAL_GLASS_ATTR);
-            element.removeAttribute(UNIVERSAL_GLASS_CLEAR_ATTR);
-          }
-        }
+        if (pruneRemoved) pruneDetachedSurfaces();
         for (const root of roots) {
           if (!root.isConnected) continue;
           // A newly inserted comment often reports both its parent and its children in one batch.
@@ -609,7 +632,8 @@
           elements.add(root);
           root.querySelectorAll(GLASS_UPDATE_SELECTOR).forEach(element => elements.add(element));
         }
-        elements.forEach(updateGlassElement);
+        const visited = new Set();
+        elements.forEach(element => updateGlassElement(element, visited));
         return;
       }
       const surfaces = new Set(document.querySelectorAll(UNIVERSAL_GLASS_TARGET_SELECTOR));
@@ -617,6 +641,7 @@
       clearSurfaces.forEach(element => surfaces.delete(element));
       const active = new Set([...surfaces, ...clearSurfaces]);
       reconcile(glassStyles, active, [UNIVERSAL_GLASS_ATTR, UNIVERSAL_GLASS_CLEAR_ATTR]);
+      pruneDetachedSurfaces();
       surfaces.forEach(element => forceSurface(
         glassStyles, element, "var(--ytc-universal-glass)", [UNIVERSAL_GLASS_ATTR]
       ));
@@ -625,13 +650,14 @@
       ));
     }
 
-    function updateGlassElement(element) {
-      if (!element.isConnected) return;
+    function updateGlassElement(element, visited) {
+      if (!element.isConnected || visited.has(element)) return;
+      visited.add(element);
       // Legacy controls can insert their real button inside another container
       // after the wrapper was styled. Reconcile those ancestors as well.
       if (element.matches(BUTTON_MATCH_SELECTOR)) {
         const wrapper = element.parentElement?.closest(BUTTON_MATCH_SELECTOR);
-        if (wrapper) updateGlassElement(wrapper);
+        if (wrapper) updateGlassElement(wrapper, visited);
       }
       if (element.matches(UNIVERSAL_GLASS_CLEAR_SELECTOR)) {
         forceSurface(glassStyles, element, "transparent", [UNIVERSAL_GLASS_CLEAR_ATTR]);
@@ -647,6 +673,7 @@
 
     function scheduleGlassUpdate(immediate = false) {
       if (disposed) return;
+      if (document.hidden) { suspendVisualUpdates(); return; }
       if (glassTimer) {
         if (!immediate) return;
         clearTimeout(glassTimer);
@@ -687,19 +714,20 @@
 
     function scheduleLiveChatSurfaces(root = document) {
       if (!glassEnabled()) return;
+      if (document.hidden) { suspendVisualUpdates(); return; }
       if (root === document) fullChatScanPending = true;
       else chatRoots.add(root.closest(LIVE_CHAT_HOST_SELECTOR) || root);
       if (chatTimer) return;
       chatTimer = setTimeout(syncLiveChatSurfaces, 0);
     }
 
-    function syncHomepageState() {
+    function syncHomepageState(refreshInline = false) {
       const active = customBackgroundEnabled() && location.pathname === "/" &&
         Boolean(document.querySelector(HOMEPAGE_SCOPE_SELECTOR));
       const wasActive = document.documentElement.hasAttribute("data-ytc-home-glass");
       document.documentElement.toggleAttribute("data-ytc-home-glass", active);
       if (!active) restoreStore(homepageStyles);
-      else if (!wasActive) {
+      else if (!wasActive || refreshInline) {
         const inlineSurfaces = document.querySelectorAll(
           HOMEPAGE_SCOPE_SELECTOR + ' [style*="background"], ytd-masthead[style*="background"], ' +
           'ytd-masthead [style*="background"], ytd-feed-filter-chip-bar-renderer[style*="background"], ' +
@@ -724,6 +752,7 @@
 
     function scheduleHomepageSync() {
       if (disposed || homepageTimer || !customBackgroundEnabled() || location.pathname !== "/") return;
+      if (document.hidden) { suspendVisualUpdates(); return; }
       homepageTimer = setTimeout(() => {
         homepageTimer = 0;
         syncHomepageState();
@@ -731,12 +760,16 @@
     }
 
     function apply(synchronous = false) {
+      if (disposed) return;
+      if (document.hidden) { suspendVisualUpdates(); return; }
+      const resumed = backgroundDirty;
+      backgroundDirty = false;
       const feed = location.pathname.match(/^\/feed\/(history|playlists|downloads|courses|clips)\/?$/)?.[1];
       const list = location.pathname === '/playlist' ? new URLSearchParams(location.search).get('list') : null;
       const library = feed || (list === 'WL' ? 'watch-later' : list === 'LL' ? 'liked' : '');
       if (glassEnabled() && library) document.documentElement.setAttribute(LIBRARY_ATTR, library);
       else document.documentElement.removeAttribute(LIBRARY_ATTR);
-      syncHomepageState();
+      syncHomepageState(resumed);
       syncAmbientBlocker(true);
       if (synchronous === true) {
         clearTimeout(glassTimer);
@@ -748,6 +781,14 @@
 
     function handleMutations(records) {
       if (disposed) return;
+      if (document.hidden) {
+        suspendVisualUpdates();
+        if (records.some(record => record.type === 'childList' &&
+            [...record.removedNodes].some(node => node instanceof Element))) {
+          pruneDetachedSurfaces();
+        }
+        return;
+      }
       let addedNodes = false;
       // Mutation records describe the final DOM state; repeated writes to the same
       // player's style/class in one frame need only one check per attribute.
@@ -855,8 +896,16 @@
       if (glassRoots.size || glassElements.size || removedGlassNodes) scheduleGlassUpdate();
     }
 
+    function onVisibilityChange() {
+      if (disposed) return;
+      if (document.hidden) { suspendVisualUpdates(); pruneDetachedSurfaces(); }
+      else if (backgroundDirty) apply();
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
     function dispose() {
       disposed = true;
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       clearTimeout(ambientTimer);
       clearTimeout(glassTimer);
       clearTimeout(chatTimer);

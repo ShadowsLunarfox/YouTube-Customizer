@@ -64,7 +64,7 @@ const fixture = `<!doctype html><html><head><style>
     ignoreDefaultArgs: ["--disable-extensions"],
     args: ["--enable-unsafe-extension-debugging", "--autoplay-policy=no-user-gesture-required"]
   });
-  const deadline = setTimeout(() => void context.close(), 60000);
+  const deadline = setTimeout(() => void context.close(), process.env.YTC_SOAK === '1' ? 240000 : 60000);
   try {
     await context.route("https://www.youtube.com/**", route => route.fulfill({ contentType: "text/html", body: fixture }));
     const cdp = await context.browser().newBrowserCDPSession();
@@ -233,6 +233,94 @@ const fixture = `<!doctype html><html><head><style>
       window.dispatchEvent(new PopStateEvent('popstate'));
     });
     await page.waitForFunction(()=>document.querySelectorAll('[data-ytc-home-shorts-card="1"]').length===36);
+    if (process.env.YTC_SOAK === '1') {
+      const session = await context.newCDPSession(page);
+      await session.send('Performance.enable');
+      const snapshot = async () => {
+        await session.send('HeapProfiler.collectGarbage');
+        const { metrics } = await session.send('Performance.getMetrics');
+        return Object.fromEntries(metrics.filter(item => ['Nodes', 'JSHeapUsedSize', 'JSEventListeners']
+          .includes(item.name)).map(item => [item.name, item.value]));
+      };
+      await page.evaluate(clip => {
+        window.soakWallpaper = document.querySelector('#ytc-background-video');
+        window.soakWallpaperSource = window.soakWallpaper.src;
+        window.soakStyle = document.querySelector('#yt-custom-progress-style');
+        window.soakClip = clip;
+        const feed = document.createElement('ytd-rich-grid-renderer');
+        feed.id = 'soak-feed'; document.querySelector('#home-cache').append(feed);
+        const seek = document.createElement('button'); seek.id = 'soak-seek'; seek.textContent = 'Seek';
+        seek.addEventListener('click', event => {
+          const video = document.querySelector('#movie_player video');
+          video.currentTime = Math.min(.3, video.duration / 2);
+          requestAnimationFrame(() => { window.soakInput = performance.now() - event.timeStamp; });
+        });
+        document.querySelector('.ytp-chrome-bottom').append(seek);
+      }, clip);
+      await page.waitForTimeout(200);
+      const before = await snapshot(), inputs = [];
+      const setHidden = hidden => popup.evaluate(async hidden => {
+        const [tab] = await chrome.tabs.query({ url: 'https://www.youtube.com/*' });
+        await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: hidden => {
+          if (hidden) Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+          else delete document.hidden;
+          document.dispatchEvent(new Event('visibilitychange'));
+        }, args: [hidden] });
+      }, hidden);
+      for (let cycle = 0; cycle < 4; cycle++) {
+        await page.locator('#movie_player video').evaluate(video => video.play());
+        // Accelerate a long feed session: 4,000 inserted/recycled nodes and
+        // native style updates, while both MP4s continuously decode frames.
+        for (let round = 0; round < 20; round++) {
+          await page.evaluate(() => {
+            const feed = document.querySelector('#soak-feed');
+            feed.replaceChildren(...Array.from({ length: 50 }, (_, i) => {
+              const item = document.createElement('div');
+              item.innerHTML = '<button>Options ' + i + '</button>';
+              item.style.background = '#111'; return item;
+            }));
+            for (const item of feed.children) item.style.background = '#222';
+          });
+          await page.waitForTimeout(100);
+        }
+        const idleMs = Number(process.env.YTC_SOAK_IDLE_MS) || 0;
+        if (idleMs > 0) await page.waitForTimeout(idleMs);
+        await setHidden(true);
+        assert.equal(await page.locator('#ytc-background-video').evaluate(video => video.paused), true,
+          'hidden wallpaper stops decoding while native playback remains independent');
+        // Throttle the actual renderer, then resume its event loop. The explicit
+        // visibility state also works in headless Chrome without a desktop tab strip.
+        await session.send('Page.setWebLifecycleState', { state: 'frozen' });
+        await new Promise(resolve => setTimeout(resolve, 1200));
+        await session.send('Page.setWebLifecycleState', { state: 'active' });
+        await setHidden(false);
+        await page.evaluate(() => {
+          document.querySelector('#soak-feed').replaceChildren(); window.soakInput = null;
+        });
+        await page.waitForFunction(() => !document.querySelector('#ytc-background-video').paused);
+        await page.locator('#soak-seek').click();
+        await page.waitForFunction(() => window.soakInput !== null);
+        inputs.push(await page.evaluate(() => window.soakInput));
+        await page.locator('.ytp-play-button').click();
+        assert.equal(await page.locator('#movie_player video').evaluate(video => video.paused), true);
+        await page.evaluate(async cycle => {
+          const video = document.querySelector('#movie_player video');
+          video.src = window.soakClip; await video.play();
+          history.replaceState({}, '', '/?soak=' + cycle);
+          document.dispatchEvent(new Event('yt-navigate-finish'));
+        }, cycle);
+        await page.waitForTimeout(250);
+      }
+      const after = await snapshot();
+      assert.ok(after.Nodes < before.Nodes + 500, `retired feed nodes are reclaimed: ${JSON.stringify({ before, after })}`);
+      assert.ok(after.JSHeapUsedSize < before.JSHeapUsedSize + 5e6, 'heap stays bounded after accelerated DOM churn');
+      assert.ok(after.JSEventListeners < before.JSEventListeners + 30, 'navigation does not accumulate listeners');
+      assert.ok(Math.max(...inputs) < 250, 'seeking paints promptly after background resume: ' + inputs.join('/'));
+      assert.equal(await page.evaluate(() => window.soakWallpaper === document.querySelector('#ytc-background-video') &&
+        window.soakWallpaperSource === window.soakWallpaper.src && window.soakStyle === document.querySelector('#yt-custom-progress-style') &&
+        document.querySelectorAll('#ytc-background-video').length === 1), true, 'one stable wallpaper/Blob/stylesheet across resumes');
+      console.log('Soak metrics:', JSON.stringify({ before, after, seekMs: inputs.map(value => +value.toFixed(1)) }));
+    }
     assert.deepEqual(errors, []);
     console.log("PASS: real MP4 playback/wallpaper with 36 Home Shorts, cached Home on Watch, and back navigation" + (process.env.YTC_AUDIO === '1' ? ', boost/EQ enabled' : '') + "; zero timeline/layout scans, independent media, dialog restoration. Pause frames (Home/Watch): " + pauseTimes.join('/') + " ms.");
   } finally {

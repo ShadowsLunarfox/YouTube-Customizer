@@ -7,17 +7,17 @@
     async function refresh() {
       const token = ++revision;
       try {
-        const result = await chrome.runtime.sendMessage({ type: 'YT_SHORTCUT_DEFAULT_STATE' });
+        const result = await YTCustomizer.sendRuntimeMessage({ type: 'YT_SHORTCUT_DEFAULT_STATE' });
         if (!disposed && token === revision) unassigned = new Set(result?.ok && Array.isArray(result.unassigned) ? result.unassigned : []);
       } catch { if (token === revision) unassigned.clear(); }
     }
     function keydown(event) {
       const command = keys[event.code];
-      if (!enabled || disposed || !command || !unassigned.has(command) || !event.isTrusted || event.repeat || event.isComposing ||
+      if (!enabled || disposed || !command || !unassigned.has(command) || !YTCustomizer.hasExtensionContext() || !event.isTrusted || event.repeat || event.isComposing ||
           event.defaultPrevented || !event.altKey || !event.shiftKey || event.ctrlKey || event.metaKey) return;
       if (event.composedPath().some(node => node instanceof Element && (node.isContentEditable || node.matches('input,textarea,select,[role="textbox"],[role="combobox"],iframe')))) return;
       event.preventDefault(); event.stopPropagation();
-      void chrome.runtime.sendMessage({ type: 'YT_SHORTCUT_DEFAULT_EXECUTE', command }).catch(() => {});
+      void YTCustomizer.sendRuntimeMessage({ type: 'YT_SHORTCUT_DEFAULT_EXECUTE', command }).catch(() => {});
     }
     function focus() { if (enabled) void refresh(); }
     document.addEventListener('keydown', keydown, true); window.addEventListener('focus', focus);

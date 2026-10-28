@@ -288,9 +288,26 @@
     return "data:image/svg+xml," + encodeURIComponent(svg);
   }
 
+  function isNativeFullscreenKey(event) {
+    return !event.isComposing && (event.key === 'Escape' || event.key?.toLowerCase() === 'f' && !event.altKey && !event.ctrlKey && !event.metaKey);
+  }
+  function hasExtensionContext() {
+    try { return Boolean(globalThis.chrome?.runtime?.id); } catch { return false; }
+  }
+  async function sendRuntimeMessage(message) {
+    if (!hasExtensionContext()) throw Error('Extension context invalidated.');
+    // An async boundary also turns synchronous Chrome API throws into a
+    // rejection, so callers' existing catch handlers can handle them.
+    return chrome.runtime.sendMessage(message);
+  }
+  function removeExtensionListener(event, listener) {
+    try { event?.removeListener(listener); } catch { /* Already invalidated by Chrome. */ }
+  }
+
   globalThis.YTCustomizer = Object.freeze({
-    version: "137", defaults, assetDefaults, presets, tabKeys, audioKeys, normalize, normalizeAssets,
+    version: "143", defaults, assetDefaults, presets, tabKeys, audioKeys, normalize, normalizeAssets,
     pageScopes, profileKeys, cardKeys, normalizeProfiles, normalizePageAssets, pageScope, resolveSettings, resolveAssets, createBackup, parseBackup,
-    isImageData, isBackgroundData, isYouTubeUrl, isSettingsPageUrl, iconDataUri
+    isImageData, isBackgroundData, isYouTubeUrl, isSettingsPageUrl, iconDataUri,
+    hasExtensionContext, sendRuntimeMessage, removeExtensionListener, isNativeFullscreenKey
   });
 })();

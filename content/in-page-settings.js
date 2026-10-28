@@ -1,5 +1,19 @@
 // An avatar-adjacent entry and an isolated, authenticated extension settings dialog.
 (() => {
+  // BEGIN GENERATED ENTRY ICON
+  const ENTRY_ICON = "<svg data-ytc-entry-icon=\"\" aria-hidden=\"true\" focusable=\"false\" style=\"width:28px;height:28px;display:block;pointer-events:none\" xmlns=\"http://www.w3.org/2000/svg\" width=\"128\" height=\"128\" viewBox=\"0 0 64 64\"><rect x=\"2\" y=\"2\" width=\"60\" height=\"60\" rx=\"17\" fill=\"#f04464\"/><path d=\"M24 17.5a2 2 0 0 1 3-1.73L45 26.16a2 2 0 0 1 0 3.46L27 40.01A2 2 0 0 1 24 38.28Z\" fill=\"#fff\"/><path d=\"M17 49h30\" fill=\"none\" stroke=\"#6b1730\" stroke-width=\"4\" stroke-linecap=\"round\"/><rect x=\"34\" y=\"44\" width=\"6\" height=\"10\" rx=\"3\" fill=\"#fff\"/></svg>";
+  // END GENERATED ENTRY ICON
+  function installEntryIcon(button) {
+    if (!button) return;
+    button.querySelectorAll('img').forEach(image => image.remove());
+    if (button.querySelector('[data-ytc-entry-icon]')) return;
+    button.insertAdjacentHTML('beforeend', ENTRY_ICON);
+  }
+  function upgradeEntryIcons() {
+    if (window !== window.top) return;
+    document.querySelectorAll('ytc-settings-entry[data-ytc-settings-owned]').forEach(entry =>
+      installEntryIcon(entry.shadowRoot?.querySelector('button')));
+  }
   function createController() {
     if (window !== window.top) return { handleMutations() {}, dispose() {}, ownsFrameUrl: () => false };
     let entry, button, shell, dialog, frame, token = '', secret = '', ready = false, disposed = false, opening = 0, scheduled = 0, loadTimer;
@@ -12,6 +26,7 @@
     const t = text => YTCustomizerI18n.translate(text, language);
     function localize() {
       const title = t('YouTube Customizer settings');
+      if (entry) entry.lang = YTCustomizerI18n.resolveLanguage(language);
       if (button) { button.title = title; button.setAttribute('aria-label', title); }
       if (dialog) dialog.setAttribute('aria-label', title);
       if (frame) frame.title = title;
@@ -21,7 +36,7 @@
       if (close) { close.title = t('Close'); close.setAttribute('aria-label', t('Close')); }
     }
     function refreshEntry() {
-      if (disposed) return;
+      if (disposed || !YTCustomizer.hasExtensionContext()) return;
       const header = document.querySelector('ytd-masthead') || document.querySelector('ytmusic-nav-bar');
       if (!header) return;
       const avatar = header.querySelector('#avatar-btn');
@@ -33,13 +48,15 @@
         entry = document.createElement('ytc-settings-entry'); entry.setAttribute('data-ytc-settings-owned', '');
         entry.style.cssText = 'display:inline-flex!important;flex:0 0 40px!important;width:40px!important;height:40px!important;align-self:center!important;margin:0 4px!important;vertical-align:middle!important;';
         const root = entry.attachShadow({ mode: 'open' });
-        root.innerHTML = `<style>:host{all:initial}button{display:flex;align-items:center;justify-content:center;width:40px;height:40px;padding:6px;border:0;border-radius:50%;background:transparent;cursor:pointer;color:var(--yt-spec-text-primary,#fff)}button:hover,button[aria-expanded="true"]{background:var(--yt-spec-badge-chip-background,#8883)}button:focus-visible{outline:2px solid var(--yt-spec-call-to-action,#3ea6ff);outline-offset:-2px}img{width:28px;height:28px;object-fit:contain;pointer-events:none}</style><button type="button" aria-haspopup="dialog" aria-expanded="false"><img alt="" aria-hidden="true"></button>`;
-        button = root.querySelector('button'); root.querySelector('img').src = chrome.runtime.getURL('icons/icon-32.png');
+        root.innerHTML = `<style>:host{all:initial}button{display:flex;align-items:center;justify-content:center;width:40px;height:40px;padding:6px;border:0;border-radius:50%;background:transparent;cursor:pointer;color:var(--yt-spec-text-primary,#fff)}button:hover,button[aria-expanded="true"]{background:var(--yt-spec-badge-chip-background,#8883)}button:focus-visible{outline:2px solid var(--yt-spec-call-to-action,#3ea6ff);outline-offset:-2px}</style><button type="button" aria-haspopup="dialog" aria-expanded="false"></button>`;
+        button = root.querySelector('button'); installEntryIcon(button);
         const buttonStyle = document.createElement('style');
         buttonStyle.textContent = globalThis.YTCustomizerContent?.buildShadowButtonCss?.() || '';
         root.append(buttonStyle);
         button.addEventListener('click', event => { event.stopPropagation(); toggle(); }); localize();
-        for (const type of ['keydown', 'keyup']) root.addEventListener(type, event => event.stopPropagation());
+        for (const type of ['keydown', 'keyup']) root.addEventListener(type, event => {
+          if (!YTCustomizer.isNativeFullscreenKey(event)) event.stopPropagation();
+        });
       }
       if (anchor) { if (entry.parentNode !== parent || entry.nextElementSibling !== anchor) parent.insertBefore(entry, anchor); }
       else if (entry.parentNode !== parent) parent.append(entry);
@@ -97,9 +114,9 @@
       root.querySelector('#loading-close').hidden = false; localize();
       dialog.showModal(); button?.setAttribute('aria-expanded', 'true');
       try {
-        const session = await chrome.runtime.sendMessage({ type: 'YT_SETTINGS_EMBED_START' });
+        const session = await YTCustomizer.sendRuntimeMessage({ type: 'YT_SETTINGS_EMBED_START' });
         if (disposed || revision !== opening || !dialog.open) {
-          if (session?.token) void chrome.runtime.sendMessage({ type: 'YT_SETTINGS_EMBED_END', token: session.token }).catch(() => {});
+          if (session?.token) void YTCustomizer.sendRuntimeMessage({ type: 'YT_SETTINGS_EMBED_END', token: session.token }).catch(() => {});
           return;
         }
         if (!session?.ok) throw Error();
@@ -121,12 +138,13 @@
     function finishClose(restoreFocus = true) {
       opening++; clearTimeout(loadTimer); frame?.remove(); frame = null; ready = false; closing = false; backdropPointer = false;
       if (dialog?.open) dialog.close(); button?.setAttribute('aria-expanded', 'false');
-      if (token) void chrome.runtime.sendMessage({ type: 'YT_SETTINGS_EMBED_END', token }).catch(() => {});
+      if (token) void YTCustomizer.sendRuntimeMessage({ type: 'YT_SETTINGS_EMBED_END', token }).catch(() => {});
       token = ''; secret = '';
       if (restoreFocus) { if (entry?.isConnected) button.focus({ preventScroll: true }); else if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true }); }
     }
     function requestClose() {
       if (!dialog?.open || closing) return;
+      if (!YTCustomizer.hasExtensionContext()) { finishClose(); return; }
       if (!frame || !ready) { finishClose(); return; }
       closing = true;
       frame.contentWindow.postMessage({ type: 'YT_SETTINGS_REQUEST_CLOSE', token }, extensionOrigin);
@@ -163,10 +181,11 @@
       },
       dispose() {
         disposed = true; menuTheme.dispose(); cancelAnimationFrame(scheduled); finishClose(false); entry?.remove(); shell?.remove();
-        chrome.storage.onChanged.removeListener(onStorage); chrome.runtime.onMessage.removeListener(onMessage); window.removeEventListener('message', onFrameMessage);
+        YTCustomizer.removeExtensionListener(chrome.storage.onChanged, onStorage);
+        YTCustomizer.removeExtensionListener(chrome.runtime.onMessage, onMessage); window.removeEventListener('message', onFrameMessage);
         document.removeEventListener('yt-navigate-finish', schedule); window.removeEventListener('popstate', schedule); document.removeEventListener('fullscreenchange', mountDialog);
       }
     };
   }
-  globalThis.YTCustomizerInPageSettings = { createController };
+  globalThis.YTCustomizerInPageSettings = { createController, upgradeEntryIcons };
 })();

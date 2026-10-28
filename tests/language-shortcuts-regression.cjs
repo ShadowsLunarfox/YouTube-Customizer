@@ -9,7 +9,7 @@ const root = path.resolve(__dirname, '..');
 const sandbox = {};
 vm.runInNewContext(fs.readFileSync(path.join(root,'i18n.js'),'utf8'),sandbox);
 const i18n = sandbox.YTCustomizerI18n;
-assert.equal(i18n.resolveLanguage('auto','zh-TW'),'zh-CN');
+assert.equal(i18n.resolveLanguage('auto','zh-TW'),'zh-TW');
 assert.equal(i18n.resolveLanguage('en','zh-CN'),'en');
 assert.equal(i18n.translate('constructor','zh-CN'),'constructor');
 assert.equal(i18n.translate('On · Reduction 3.5 dB','zh-CN'),'开启 · 衰减 3.5 dB');

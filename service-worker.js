@@ -153,3 +153,9 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
   });
   return true;
 });
+
+// Discard obsolete window snapshots without changing any browser window.
+void chrome.storage.session.get(null).then(values => {
+  const keys = Object.keys(values).filter(key => key.startsWith('fullscreenWindow:'));
+  if (keys.length) return chrome.storage.session.remove(keys);
+}).catch(() => {});

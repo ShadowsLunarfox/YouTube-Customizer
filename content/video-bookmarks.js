@@ -47,12 +47,14 @@
     let data = normalize(), dataRevision = 0, editing = '', open = false, busy = false, language = 'auto';
     let anchorTime = 0, ad = false;
     const t = text => YTCustomizerI18n.translate(text, language);
+    let noticeSource = '';
     const $ = selector => root?.querySelector(selector);
     const isAd = () => Boolean(video?.closest('.ad-showing,.ad-interrupting'));
     const owned = 'data-ytc-bookmarks-owned';
     const key = value => 'videoBookmarks:' + value;
     const sorted = () => [...data.points].sort((a, b) => a.time - b.time || a.createdAt - b.createdAt);
     function notice(text, error = false) {
+      noticeSource = text;
       if (!root) return;
       $('#bookmark-status').textContent = t(text); $('#bookmark-status').classList.toggle('error', error);
     }
@@ -85,6 +87,9 @@
     }
     function localize() {
       if (!root) return;
+      host.lang = YTCustomizerI18n.resolveLanguage(language);
+      if (markers) markers.lang = host.lang;
+      $('#bookmark-status').textContent = t(noticeSource);
       for (const node of root.querySelectorAll('[data-text]')) node.textContent = t(node.dataset.text);
       $('#bookmark-time').setAttribute('aria-label', t('Timestamp')); $('#bookmark-note').setAttribute('aria-label', t('Note (optional)'));
       $('#bookmark-note').placeholder = t('Write a note...');
@@ -142,7 +147,7 @@
       video.currentTime = Math.min(point.time, video.duration);
     }
     async function write(action, payload, target) {
-      const result = await chrome.runtime.sendMessage({ type: 'YT_VIDEO_BOOKMARK_WRITE', videoId: target, action, payload });
+      const result = await YTCustomizer.sendRuntimeMessage({ type: 'YT_VIDEO_BOOKMARK_WRITE', videoId: target, action, payload });
       if (!result?.ok) throw Error(result?.error || 'Could not save bookmark. Try again.');
       if (!disposed && target === id) { dataRevision++; data = normalize(result.data); render(); }
       return result.data;
@@ -183,14 +188,17 @@
       if (!enabled || !id || !track) { markers?.remove(); host?.remove(); return; }
       if (!markers) {
         markers = document.createElement('ytc-bookmark-markers'); markers.setAttribute(owned, '');
+        markers.lang = YTCustomizerI18n.resolveLanguage(language);
         markers.style.cssText = 'position:absolute!important;inset:0!important;display:block!important;pointer-events:none!important;z-index:40!important;';
         markerRoot = markers.attachShadow({ mode: 'open' });
         markerRoot.innerHTML = `<style>:host{all:initial;font:12px/1.3 Roboto,Arial,"Microsoft YaHei",sans-serif}*{box-sizing:border-box}button{font:inherit;cursor:pointer;color:#fff4bf;text-shadow:none}button:focus-visible,#bookmark-rail:focus-visible{outline:2px solid #fff;outline-offset:2px}#bookmark-rail{position:absolute;top:-15px;left:0;right:0;height:14px;pointer-events:auto;cursor:copy;border-bottom:1px dashed #ffdc7666;touch-action:none}#bookmark-rail:hover{background:#ffdc7625;border-color:#ffdc76}#bookmark-add{position:absolute;left:0;bottom:calc(100% + 20px);display:flex;align-items:center;gap:5px;padding:4px 8px;min-height:26px;border:1px solid #ffdc7688;border-radius:4px;background:#201a10dc;pointer-events:auto;white-space:nowrap}#bookmark-add:hover{background:#5d4820}#bookmark-add:disabled{display:none}#bookmark-add b{font-size:18px;line-height:1}.pin{position:absolute;top:-11px;transform:translateX(-50%);width:16px;height:24px;padding:0;border:0;background:transparent;pointer-events:auto;touch-action:none}.pin::before{content:"";display:block;width:11px;height:11px;border:1px solid #694d12;border-radius:2px 4px 2px 2px;background:#ffe493;box-shadow:0 1px 3px #0008}.pin::after{content:"";display:block;width:2px;height:9px;background:#ffe493;margin-left:5px;box-shadow:0 0 1px #241b09}.pin:hover::before,.pin[aria-pressed="true"]::before{background:#fff9df;border-color:#fff}.pin:focus-visible{outline-offset:0}</style><div id="bookmark-rail" role="button" tabindex="0"></div><div id="ticks"></div><button id="bookmark-add" type="button" aria-expanded="false"><b aria-hidden="true">＋</b><span></span></button>`;
         markerRoot.addEventListener('pointerdown', event => { event.preventDefault(); event.stopPropagation(); });
         markerRoot.addEventListener('mousedown', event => { event.preventDefault(); event.stopPropagation(); });
-        for (const type of ['pointerup', 'mouseup', 'dblclick', 'keyup']) markerRoot.addEventListener(type, event => event.stopPropagation());
+        for (const type of ['pointerup', 'mouseup', 'dblclick', 'keyup']) markerRoot.addEventListener(type, event => {
+          if (type !== 'keyup' || !YTCustomizer.isNativeFullscreenKey(event)) event.stopPropagation();
+        });
         markerRoot.addEventListener('keydown', event => {
-          event.stopPropagation();
+          if (!YTCustomizer.isNativeFullscreenKey(event)) event.stopPropagation();
           if (event.target.id === 'bookmark-rail' && ['Enter', ' '].includes(event.key)) { event.preventDefault(); try { openNote(video.currentTime); } catch (error) { notice(error.message, true); } }
         });
         const buttonStyle = document.createElement('style');
@@ -279,7 +287,7 @@
         document.removeEventListener('pointerdown', outside, true);
         document.removeEventListener('yt-navigate-finish', schedule); window.removeEventListener('popstate', schedule);
         for (const type of ['loadedmetadata', 'durationchange', 'emptied']) document.removeEventListener(type, media, true);
-        chrome.storage.onChanged.removeListener(storage);
+        YTCustomizer.removeExtensionListener(chrome.storage.onChanged, storage);
       }
     };
   }

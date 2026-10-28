@@ -1,4 +1,4 @@
-// A small bilingual finder for the existing settings form; navigation never changes a value.
+// Search all supported menu languages; navigation never changes a setting's value.
 (() => {
   function create({ activateTab }) {
     const input = document.getElementById('settingsSearch'), clear = document.getElementById('clearSettingsSearch');
@@ -10,7 +10,7 @@
       bookmarkStats:'timeline records bookmarks statistics count notes 进度条 播放条 记录点 标记 小纸条 笔记 统计 总数 数量',
       menuTheme:'menu theme system dark light mode night 深色 浅色 夜间 黑暗 亮色 主题 模式 系统',
       useDefaultShortcuts:'keyboard default shortcuts hotkeys 快捷键 默认 按键 热键',
-      menuLanguage:'languages chinese english 中文 英文 语言', editingScope:'profile shared page configuration 全局 共用 独立 页面 配置',
+      menuLanguage:'languages chinese english simplified traditional cantonese japanese korean thai malay indonesian 中文 英文 语言 語言 简体 簡體 繁体 繁體 粤语 粵語 广东话 廣東話 日文 日语 日語 韩文 韓文 韩语 韓語 泰文 泰语 泰語 马来文 馬來文 马来语 馬來語 印尼文 印尼语 印尼語', editingScope:'profile shared page configuration 全局 共用 独立 页面 配置',
       pageProfileEnabled:'profile override 独立配置 分页', pictureInPicture:'pip floating video 画中画 浮窗 小窗',
       configureShortcuts:'keyboard hotkey shortcut 快捷键 热键', uploadBackground:'wallpaper image video gif mp4 upload 壁纸 背景 图片 动图 上传',
       uiOpacity:'transparency glass 透明 毛玻璃', uiBlur:'frosted glass 毛玻璃 模糊', backgroundOpacity:'wallpaper transparency 透明 壁纸',
@@ -24,6 +24,7 @@
     };
     const normalize = text => text.normalize('NFKC').toLowerCase().replace(/[-_/]+/g,' ').replace(/\s+/g,' ').trim();
     const entries = [], seen = new Set();
+    const translations = text => YTCustomizerI18n.languages.map(language => YTCustomizerI18n.translate(text, language.code));
     function add(control, label, row = control) {
       if (!control?.id || !label || seen.has(control.id) || control instanceof HTMLOutputElement) return;
       seen.add(control.id);
@@ -31,10 +32,10 @@
       const category = tab?.textContent || 'Menu';
       const group = control.closest('fieldset')?.querySelector('legend')?.textContent || '';
       const path = [...new Set([category,group].filter(Boolean))].join(' · ');
-      const options = control instanceof HTMLSelectElement ? [...control.options].map(option => option.textContent + ' ' + YTCustomizerI18n.translate(option.textContent,'zh-CN')).join(' ') : '';
-      const primary = normalize(label + ' ' + YTCustomizerI18n.translate(label,'zh-CN'));
+      const options = control instanceof HTMLSelectElement ? [...control.options].flatMap(option => translations(option.textContent)).join(' ') : '';
+      const primary = normalize(translations(label).join(' '));
       entries.push({ control, label, row, tab, path, primary,
-        keywords:normalize([primary,path,YTCustomizerI18n.translate(path,'zh-CN'),options,control.id.replace(/([a-z])([A-Z])/g,'$1 $2'),aliases[control.id] || ''].join(' ')) });
+        keywords:normalize([primary, ...translations(path), options, control.id.replace(/([a-z])([A-Z])/g,'$1 $2'), aliases[control.id] || ''].join(' ')) });
     }
     document.querySelectorAll('[role="tabpanel"] :is(.field,.check-field,.upload-field)').forEach(row => {
       add(row.querySelector('input:not([type="file"]),select,button,output'),row.querySelector(':scope > span')?.textContent.trim(),row);

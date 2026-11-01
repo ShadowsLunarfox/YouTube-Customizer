@@ -89,6 +89,7 @@ const fixture = `<!doctype html><style>
     }, gif);
     await popup.reload();
     await popup.waitForSelector("#settings-form:not([inert])");
+    await popup.evaluate(() => previewMediaReady);
     assert.ok(await popup.locator('.theme-preview').evaluate(el => el.style.backgroundImage.includes('blob:')), "local media previews work under the CSP");
 
     const page = await context.newPage();

@@ -887,7 +887,7 @@
           display: flex !important; flex-direction: column !important; height: 100% !important;
         }` : ''}
       `}
-    `;
+    ` + (!isMusic ? runtime.buildCommentsCss?.() || '' : '');
   }
 
   function buildGridCss(settings) {
@@ -1236,7 +1236,7 @@
   observer.observe(document.documentElement, {
     childList: true, subtree: true,
     ...(!isMusic && { attributes: true,
-      attributeFilter: ["style", "class", "hidden", "role", "has-paygated-featured-badge", "is-shorts",
+      attributeFilter: ["style", "class", "hidden", "aria-hidden", "role", "has-paygated-featured-badge", "is-shorts",
         "is-playables", "is-mini-game-card-shelf", "is-game-card-shelf"] })
   });
 

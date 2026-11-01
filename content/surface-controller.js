@@ -13,6 +13,9 @@
   const UNIVERSAL_GLASS_ATTR = "data-ytc-universal-glass";
   const UNIVERSAL_GLASS_CLEAR_ATTR = "data-ytc-universal-clear";
   const GLASS_BACKDROP = "var(--ytc-ui-backdrop)";
+  // Avatar links/buttons keep their native circular image, not a glass tile.
+  const COMMENT_AVATAR_SELECTOR = 'ytd-comments :is(#author-thumbnail, #author-thumbnail-button, #creator-heart-button, #hearted-thumbnail), ' +
+    'ytd-comments :is(#author-thumbnail, #creator-heart-button) :is(a, button, yt-img-shadow)';
   // Style the actual interactive surface once, rather than tinting both a
   // legacy custom-element wrapper and the button it contains.
   const BUTTON_ELEMENTS = 'button, input:is([type="button"], [type="submit"], [type="reset"]), ' +
@@ -28,7 +31,7 @@
   const BUTTON_EXCLUSIONS = PLAYER_SCOPE_SELECTOR + ', .html5-video-container, video, img, canvas, iframe, ' +
     '.ytp-scrubber-button, .ytp-progress-bar, .ytp-cued-thumbnail-overlay, [data-ytc-bookmark-pin], ' +
     'ytd-thumbnail, yt-thumbnail-view-model, .ytThumbnailViewModelHost, ' +
-    '.ytLockupViewModelContentImage, .yt-lockup-view-model__content-image';
+    '.ytLockupViewModelContentImage, .yt-lockup-view-model__content-image, ' + COMMENT_AVATAR_SELECTOR;
   const BUTTON_SURFACE_SELECTOR = `${BUTTON_MATCH_SELECTOR}:not(:has(${BUTTON_MATCH_SELECTOR})):not(:where(${BUTTON_EXCLUSIONS}))`;
   const BUTTON_WRAPPER_SELECTOR = `${BUTTON_MATCH_SELECTOR}:has(${BUTTON_MATCH_SELECTOR}):not(:where(${BUTTON_EXCLUSIONS}, ` +
     'yt-chip-cloud-chip-renderer, .html5-video-player.ytp-delhi-modern.ytp-delhi-horizontal-volume-controls .ytp-volume-area, ' +
@@ -57,6 +60,10 @@
     "ytd-download-quality-selector-renderer"
   ];
   const DIALOG_SURFACE_SELECTOR = DIALOG_SURFACE_SELECTORS.join(",");
+  // Native dialogs stay cached after dismissal. Leave their closed paint state
+  // alone in both CSS and inline repair, including their nested controls.
+  const CLOSED_DIALOG_SELECTOR = `:is(${DIALOG_SURFACE_SELECTOR}):is([hidden], [aria-hidden="true"], [style*="display: none"], [style*="display:none"])`;
+  const ACTIVE_DIALOG_CONTEXT = `:not(:where(${CLOSED_DIALOG_SELECTOR}, :is(${CLOSED_DIALOG_SELECTOR}) *))`;
   const DIALOG_CONTENT_SELECTOR = `:is(${DIALOG_SURFACE_SELECTOR}) :is(
     .ytContextualSheetLayoutHeaderContainer, .ytContextualSheetLayoutContentContainer,
     .ytContextualSheetLayoutFooterContainer, .ytSpecDialogLayoutContainer,
@@ -276,6 +283,8 @@
     "ytd-comments #contents", "ytd-comments #header", "ytd-comments ytd-comments-header-renderer",
     "ytd-comments ytd-comment-thread-renderer", "ytd-comments ytd-comment-renderer",
     "ytd-comments ytd-comment-view-model", "ytd-comments ytd-comment-simplebox-renderer",
+    "ytd-comments ytd-comment-dialog-renderer", "ytd-engagement-panel-section-list-renderer ytd-comments",
+    COMMENT_AVATAR_SELECTOR,
     "ytd-comments ytd-comment-thread-renderer #body",
     SHORTS_PANEL_CLEAR_SELECTOR,
     "ytd-watch-next-secondary-results-renderer #items", "ytd-watch-next-secondary-results-renderer #contents",
@@ -340,6 +349,9 @@
   const HOMEPAGE_SCOPE_SELECTOR = 'ytd-browse[page-subtype="home"]';
   const LIVE_CHAT_SHADOW_STYLE_ATTR = "data-ytc-live-chat-surface";
   function buildButtonCss(scope = 'html[data-ytc-theme] body') {
+    const lightingOwner = ':is(button, [role="button"], button-view-model, yt-button-view-model, yt-button-shape, ' +
+      '.ytSpecButtonViewModelHost, segmented-like-dislike-button-view-model, ytd-button-renderer, ' +
+      'ytd-toggle-button-renderer, ytmusic-button-renderer, ytmusic-toggle-button-renderer, yt-chip-cloud-chip-renderer)';
     return `
       ${scope} :is(${BUTTON_ELEMENTS}, yt-chip-cloud-chip-renderer) {
         --yt-spec-text-primary: #fff;
@@ -355,11 +367,59 @@
         color: var(--ytc-button-text, #fff) !important;
       }
       ${scope} :is(${BUTTON_ELEMENTS}) svg { fill: currentColor !important; }
-      ${scope} ${BUTTON_SURFACE_SELECTOR} {
+      ${scope} ${BUTTON_SURFACE_SELECTOR}${ACTIVE_DIALOG_CONTEXT} {
         background: var(--ytc-universal-glass, var(--ytc-ui-background)) !important;
         background-image: none !important;
         -webkit-backdrop-filter: ${GLASS_BACKDROP} !important;
         backdrop-filter: ${GLASS_BACKDROP} !important;
+        border-radius: 12px !important;
+      }
+      ${scope} ${BUTTON_SURFACE_SELECTOR}:is(button, input, tp-yt-paper-button, tp-yt-paper-icon-button, yt-icon-button,
+        .ytSpecButtonShapeNextHost, .yt-spec-button-shape-next, .ytp-button) {
+        border-radius: 999px !important;
+      }
+      ${scope} ${BUTTON_SURFACE_SELECTOR}:is(tp-yt-paper-item, ytd-guide-entry-renderer, ytd-mini-guide-entry-renderer,
+        ytd-menu-service-item-renderer, ytd-menu-navigation-item-renderer, ytd-compact-link-renderer, yt-list-item-view-model,
+        [role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]) {
+        border-radius: 12px !important;
+        margin-block: 3px !important;
+      }
+      /* Space the native groups without shrinking their buttons or click targets. */
+      ${scope} ytd-watch-metadata :is(#top-level-buttons-computed, #flexible-item-buttons),
+      ${scope} :is(.ytp-left-controls, .ytp-right-controls, .ytp-right-controls-left, .ytp-right-controls-right) {
+        column-gap: 4px !important;
+      }
+      ${scope} .ytp-panel-menu { border-collapse: separate !important; border-spacing: 0 4px !important; }
+      ${scope} :is(.ytSegmentedLikeDislikeButtonViewModelSegmentedButtonsWrapper,
+        .yt-segmented-like-dislike-button-view-model-wiz__segmented-buttons-wrapper,
+        ytd-segmented-like-dislike-button-renderer) {
+        column-gap: 6px !important;
+        background: transparent !important;
+      }
+      ${scope} :is(dislike-button-view-model, ytd-segmented-like-dislike-button-renderer #dislike-button) {
+        border-inline-start: 0 !important;
+      }
+      ${scope} :is(.ytSegmentedLikeDislikeButtonViewModelSegmentedButtonsWrapper,
+        .ytSpecButtonShapeNextSegmentedStart, .ytSpecButtonShapeNextSegmentedEnd)::before,
+      ${scope} :is(.ytSegmentedLikeDislikeButtonViewModelSegmentedButtonsWrapper,
+        .ytSpecButtonShapeNextSegmentedStart, .ytSpecButtonShapeNextSegmentedEnd)::after {
+        content: none !important;
+      }
+      /* Mainstage buttons add a separate rim/wash above their flat fill. */
+      ${scope} ${lightingOwner} :is(yt-light-shape, .contribYtLightShapeHost) {
+        display: none !important;
+        background: transparent !important;
+        box-shadow: none !important;
+      }
+      ${scope} :is(.ytSpecButtonShapeNextHost, .yt-spec-button-shape-next, .ytChipShapeChip)::before,
+      ${scope} :is(.ytSpecButtonShapeNextHost, .yt-spec-button-shape-next, .ytChipShapeChip)::after,
+      ${scope} ${lightingOwner} :is(yt-light-shape, .contribYtLightShapeHost)::before,
+      ${scope} ${lightingOwner} :is(yt-light-shape, .contribYtLightShapeHost)::after {
+        background-image: none !important;
+        box-shadow: none !important;
+      }
+      @media (max-width: 600px) {
+        ${scope} :is(.ytp-left-controls, .ytp-right-controls, .ytp-right-controls-left, .ytp-right-controls-right) { column-gap: 2px !important; }
       }
       ${scope} ${BUTTON_SURFACE_SELECTOR}:hover:not(:disabled, [disabled], [aria-disabled="true"]) {
         outline: 1px solid rgb(255 255 255 / 40%);
@@ -368,7 +428,7 @@
       ${scope} ${BUTTON_SURFACE_SELECTOR}:is(:disabled, [disabled], [aria-disabled="true"]) {
         opacity: .5;
       }
-      ${scope} :is(${BUTTON_WRAPPER_SELECTOR}, ${BUTTON_INNER_SELECTOR}) {
+      ${scope} :is(${BUTTON_WRAPPER_SELECTOR}, ${BUTTON_INNER_SELECTOR})${ACTIVE_DIALOG_CONTEXT} {
         background: transparent !important;
         background-image: none !important;
         -webkit-backdrop-filter: none !important;
@@ -435,14 +495,15 @@
     let homepageTimer = 0;
     let fullGlassScanPending = false;
     let fullChatScanPending = false;
-    let removedGlassNodes = false;
     let backgroundDirty = false;
     const ambientRoots = new Set();
     const chatRoots = new Set();
     const glassRoots = new Set();
     const glassElements = new Set();
+    const removedRoots = new Set();
     const ownStyleValues = new WeakMap();
     const dialogRoots = new WeakSet();
+    const closedDialogs = new WeakSet();
     const glassStyles = new Map();
     const homepageStyles = new Map();
 
@@ -507,6 +568,45 @@
       }
     }
 
+    function releaseSurfaceSubtree(root) {
+      const release = element => {
+        if (glassStyles.has(element)) {
+          restoreElement(glassStyles, element);
+          element.removeAttribute(UNIVERSAL_GLASS_ATTR);
+          element.removeAttribute(UNIVERSAL_GLASS_CLEAR_ATTR);
+          dialogRoots.delete(element);
+        }
+        if (homepageStyles.has(element)) restoreElement(homepageStyles, element);
+      };
+      release(root);
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+      while (walker.nextNode()) release(walker.currentNode);
+    }
+
+    // A play icon or clock replacement must not revisit the entire page cache.
+    // Walk only retired subtrees; nodes moved elsewhere in the page stay owned.
+    function pruneRemovedSurfaces(roots) {
+      for (const root of roots) {
+        if (root.isConnected) continue;
+        let nested = false;
+        for (let parent = root.parentElement; parent; parent = parent.parentElement) {
+          if (roots.has(parent)) { nested = true; break; }
+        }
+        if (nested) continue;
+        releaseSurfaceSubtree(root);
+      }
+    }
+
+    function releaseClosedDialog(root, record) {
+      const known = closedDialogs.has(root);
+      if (!known) { closedDialogs.add(root); releaseSurfaceSubtree(root); }
+      if (record?.type === 'childList') {
+        // Cached forms can replace content or receive previously styled nodes.
+        if (known) for (const node of record.addedNodes) if (node instanceof Element) releaseSurfaceSubtree(node);
+        pruneRemovedSurfaces(new Set([...record.removedNodes].filter(node => node instanceof Element)));
+      }
+    }
+
     function suspendVisualUpdates() {
       backgroundDirty = true;
       clearTimeout(ambientTimer);
@@ -514,6 +614,7 @@
       clearTimeout(chatTimer);
       clearTimeout(homepageTimer);
       ambientTimer = glassTimer = chatTimer = homepageTimer = 0;
+      pruneRemovedSurfaces(removedRoots); removedRoots.clear();
       ambientRoots.clear(); chatRoots.clear(); glassRoots.clear(); glassElements.clear();
       // Remember work, not historical DOM nodes. Background timers can be
       // throttled for minutes; on return only the current document matters.
@@ -530,6 +631,9 @@
     // Background shorthand is intentional: YouTube frequently restores black with `background`,
     // so override that single declaration without mixing its longhand properties inline.
     function forceSurface(store, element, color, attributes = []) {
+      const closed = element.closest(CLOSED_DIALOG_SELECTOR);
+      if (closed) { releaseClosedDialog(closed); return; }
+      closedDialogs.delete(element);
       const backdrop = surfaceBackdrop(element, color);
       forceStyle(store, element, "background", color);
       forceStyle(store, element, "box-shadow", "none");
@@ -610,9 +714,9 @@
       const fullScan = fullGlassScanPending;
       const roots = new Set(glassRoots);
       const elements = new Set(glassElements);
-      const pruneRemoved = removedGlassNodes;
+      const retired = new Set(removedRoots);
       fullGlassScanPending = false;
-      removedGlassNodes = false;
+      removedRoots.clear();
       glassRoots.clear();
       glassElements.clear();
       if (!glassEnabled()) {
@@ -620,7 +724,7 @@
         return;
       }
       if (!fullScan) {
-        if (pruneRemoved) pruneDetachedSurfaces();
+        pruneRemovedSurfaces(retired);
         for (const root of roots) {
           if (!root.isConnected) continue;
           // A newly inserted comment often reports both its parent and its children in one batch.
@@ -783,16 +887,19 @@
       if (disposed) return;
       if (document.hidden) {
         suspendVisualUpdates();
-        if (records.some(record => record.type === 'childList' &&
-            [...record.removedNodes].some(node => node instanceof Element))) {
-          pruneDetachedSurfaces();
+        const retired = new Set();
+        for (const record of records) {
+          if (record.type !== 'childList') continue;
+          for (const node of record.removedNodes) if (node instanceof Element) retired.add(node);
         }
+        pruneRemovedSurfaces(retired);
         return;
       }
       let addedNodes = false;
       // Mutation records describe the final DOM state; repeated writes to the same
       // player's style/class in one frame need only one check per attribute.
       const seenAttributes = new WeakMap();
+      const closedAncestors = new WeakMap();
       for (const record of records) {
         const target = record.target;
         if (!(target instanceof Element)) continue;
@@ -804,6 +911,14 @@
         }
         if (record.type === "attributes" && record.attributeName === "style" &&
             ownStyleValues.get(target) === target.getAttribute("style")) continue;
+        const candidate = glassEnabled() && (glassStyles.has(target) || closedDialogs.has(target) || mightBeGlassElement(target));
+        if (record.type === 'childList' || candidate) {
+          if (!closedAncestors.has(target)) closedAncestors.set(target, target.closest(CLOSED_DIALOG_SELECTOR));
+          const closed = closedAncestors.get(target);
+          if (closed) { releaseClosedDialog(closed, record); continue; }
+          // Visibility can change without a paint or class change.
+          if (closedDialogs.has(target)) { closedDialogs.delete(target); glassRoots.add(target); }
+        }
         if (record.type === "childList") {
           let changedElements = false;
           for (const node of record.addedNodes) {
@@ -816,7 +931,7 @@
           for (const node of record.removedNodes) {
             if (!(node instanceof Element)) continue;
             changedElements = true;
-            if (glassEnabled()) removedGlassNodes = true;
+            if (glassEnabled()) removedRoots.add(node);
           }
           // Text updates cannot introduce a new glass surface.
           if (!changedElements) continue;
@@ -847,7 +962,7 @@
               glassRoots.add(membershipShelf);
             }
           }
-        } else if (glassEnabled() && (glassStyles.has(target) || mightBeGlassElement(target) ||
+        } else if (glassEnabled() && (candidate ||
             record.attributeName === "class" && target.closest('ytd-badge-supported-renderer'))) {
           if (record.attributeName === "style") {
             const managed = glassStyles.get(target);
@@ -893,7 +1008,7 @@
         }
       }
       if (addedNodes) scheduleHomepageSync();
-      if (glassRoots.size || glassElements.size || removedGlassNodes) scheduleGlassUpdate();
+      if (glassRoots.size || glassElements.size || removedRoots.size) scheduleGlassUpdate();
     }
 
     function onVisibilityChange() {
@@ -912,6 +1027,7 @@
       clearTimeout(homepageTimer);
       glassRoots.clear();
       glassElements.clear();
+      removedRoots.clear();
       ambientRoots.clear();
       chatRoots.clear();
       restoreStore(glassStyles, [UNIVERSAL_GLASS_ATTR, UNIVERSAL_GLASS_CLEAR_ATTR]);
@@ -1510,7 +1626,7 @@
     html[data-ytc-theme][data-ytc-blur] ytd-watch-flexy :is(#below, #secondary) {
       view-transition-name: none !important;
     }
-    html[data-ytc-theme] :is(${UNIVERSAL_GLASS_TARGET_SELECTOR}) {
+    html[data-ytc-theme] :is(${UNIVERSAL_GLASS_TARGET_SELECTOR})${ACTIVE_DIALOG_CONTEXT} {
       background: var(--ytc-universal-glass) !important;
       box-shadow: none !important;
       backdrop-filter: ${GLASS_BACKDROP} !important;
@@ -1587,7 +1703,8 @@
     html[data-ytc-theme] ytd-live-chat-frame :is(#chat, iframe) {
       border-radius: 16px !important;
     }
-    html[data-ytc-theme] :is(${UNIVERSAL_GLASS_CLEAR_SELECTOR}) {
+    html[data-ytc-theme] :is(${COMMENT_AVATAR_SELECTOR}) { border-radius: 50% !important; }
+    html[data-ytc-theme] :is(${UNIVERSAL_GLASS_CLEAR_SELECTOR})${ACTIVE_DIALOG_CONTEXT} {
       background: transparent !important;
       box-shadow: none !important;
       backdrop-filter: none !important;
@@ -1605,17 +1722,17 @@
       display: block !important;
       opacity: 1 !important;
     }
-    html[data-ytc-theme] :is(${BACKDROP_RESET_SELECTOR}) {
+    html[data-ytc-theme] :is(${BACKDROP_RESET_SELECTOR})${ACTIVE_DIALOG_CONTEXT} {
       filter: none !important;
     }
-    html[data-ytc-theme] :is(${BACKDROP_RESET_SELECTOR})::before,
-    html[data-ytc-theme] :is(${BACKDROP_RESET_SELECTOR})::after {
+    html[data-ytc-theme] :is(${BACKDROP_RESET_SELECTOR})${ACTIVE_DIALOG_CONTEXT}::before,
+    html[data-ytc-theme] :is(${BACKDROP_RESET_SELECTOR})${ACTIVE_DIALOG_CONTEXT}::after {
       -webkit-backdrop-filter: none !important;
       backdrop-filter: none !important;
       filter: none !important;
     }
-    html[data-ytc-theme] :is(${UNIVERSAL_GLASS_TARGET_SELECTOR}, ${UNIVERSAL_GLASS_CLEAR_SELECTOR}):not(:is(${BUTTON_ELEMENTS}))::before,
-    html[data-ytc-theme] :is(${UNIVERSAL_GLASS_TARGET_SELECTOR}, ${UNIVERSAL_GLASS_CLEAR_SELECTOR}):not(:is(${BUTTON_ELEMENTS}))::after {
+    html[data-ytc-theme] :is(${UNIVERSAL_GLASS_TARGET_SELECTOR}, ${UNIVERSAL_GLASS_CLEAR_SELECTOR}):not(:is(${BUTTON_ELEMENTS}))${ACTIVE_DIALOG_CONTEXT}::before,
+    html[data-ytc-theme] :is(${UNIVERSAL_GLASS_TARGET_SELECTOR}, ${UNIVERSAL_GLASS_CLEAR_SELECTOR}):not(:is(${BUTTON_ELEMENTS}))${ACTIVE_DIALOG_CONTEXT}::after {
       background: transparent !important;
       box-shadow: none !important;
       backdrop-filter: none !important;

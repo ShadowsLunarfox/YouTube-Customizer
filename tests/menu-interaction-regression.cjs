@@ -60,6 +60,7 @@ body{margin:0;background:#18202a;color:white;font:14px Arial}ytd-masthead{displa
     await page.waitForFunction(() => document.querySelector('ytc-settings-modal')?.shadowRoot.querySelector('iframe:not([data-loading])'));
     let view = page.frames().find(f => f.url().includes('/popup.html?embedded=1'));
     await view.waitForFunction(() => initialized && !form.inert && !document.body.inert);
+    await view.evaluate(() => previewMediaReady);
     await view.evaluate(() => {
       const send = chrome.tabs.sendMessage.bind(chrome.tabs);
       globalThis.__dragProbe = { messages: 0, mediaBytes: 0, thumbWrites: 0, outputWrites: 0, calls: [], longTasks: [] };

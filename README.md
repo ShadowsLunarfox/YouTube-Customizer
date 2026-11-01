@@ -14,7 +14,11 @@
 
 > Customize YouTube's appearance, player, and layout. Changes are previewed on the current YouTube tab as you adjust the settings.
 
-Long sessions release retired feed surfaces and removed player audio graphs. Background tabs discard obsolete visual update queues and reconcile the current page on return; video wallpapers pause while hidden and reuse their existing media and Blob URL on resume.
+Long sessions release retired feed surfaces and removed player audio graphs. Small player icon/clock replacements clean up only their removed subtrees instead of rechecking every retained comment and recommendation, including in background tabs. Background tabs discard obsolete visual update queues and reconcile the current page on return; video wallpapers pause while hidden and reuse their existing media and Blob URL on resume.
+
+Closing a native dialog, including Report, releases its glass styling and all nested surface overrides. Cached hidden forms are left idle until reopened, so native cancellation updates do not trigger repeated background and blur rewrites.
+
+The in-page menu displays its shell before loading the authenticated form. Local wallpaper and icon previews decode in small chunks and use revocable Blob URLs; preview videos pause outside Appearance. Closing unchanged settings performs no storage writes, while pending edits finish saving before the frame is removed.
 
 Old page callbacks handle an extension reload without uncaught context errors. Automatic language detection caches the browser language and falls back to the page's browser language if extension APIs are unavailable. Refresh existing YouTube tabs after reloading the extension to load the new runtime.
 
@@ -30,7 +34,8 @@ Old page callbacks handle an extension reload without uncaught context errors. A
 
 - Choose the **Charcoal**, **Light**, **Forest**, or **Windows Classic** theme, or set your own page, surface, text, and accent colors.
 - Adjust UI opacity from 0–100% and frosted-glass blur from 0–30 px.
-- Buttons on YouTube pages keep white labels over translucent glass, including player controls, menus, filters and timeline-note actions. Opacity and blur follow the page settings; buttons in frosted panels share the panel's blur. The settings menu keeps its separate light/dark design.
+- Buttons on YouTube pages keep white labels over flat translucent glass, with rounded corners and small gaps between neighboring actions and menu rows. Native button gradients and glossy lighting overlays are suppressed. Like/dislike controls have separate rounded backgrounds. Opacity and blur follow the page settings; buttons in frosted panels share the panel's blur. Avatar images stay circular with clear corners. The settings menu keeps its separate light/dark design.
+- With the page theme and **Layout → Customize card layout** enabled, the comments area uses one shared glass surface, outlined comment threads, a framed composer, clearer author/time/like-count text, and consistent spacing. Comment buttons have a darker transparent tint to keep white labels readable on light backgrounds. Native sorting, replies, Read more, badges and comment menus remain in place. Classic comments, modern threaded replies and engagement panels share the styling; narrow windows use tighter padding. Styling is CSS-only and turns off with card customization or the page theme.
 - Upload a background image, GIF, or MP4 video up to 20 MB, choose Fill or Fit, and adjust its opacity. Images can also be tiled. MP4 videos loop silently.
 - YouTube ambient lighting is suppressed while a custom background is active.
 - In theater mode (T), the empty space around the video reveals your wallpaper with the current UI blur setting.
@@ -59,7 +64,7 @@ Old page callbacks handle an extension reload without uncaught context errors. A
 ### 🧩 Layout and browsing
 
 - Set Home videos and Shorts to 2–6 items per row, with fewer columns on narrow windows. Disable hover previews or reduce motion.
-- Enable **Customize card layout** to adjust corner radius, border width, padding, gaps, section spacing, title lines, and equal row heights. Compact Music lists retain their native row height.
+- Enable **Customize card layout** to adjust corner radius, border width, padding, gaps, section spacing, title lines, and equal row heights. Themed comment cards and their composer share the corner, border, padding and spacing controls; comment text keeps its native Read more behavior. Compact Music lists retain their native row height.
 - Home Premium image and single-video promotions share the rounded glass frame, inset artwork and text, and section spacing. Their content wraps on narrow windows; video cards keep their own inset frame and usable menus.
 - At the top of **Layout → Home sections**, independently hide **single-video promotions** or **YouTube Playables games**. The all-featured/membership/Premium option includes single-video promotions; topic and shopping recommendations have their own switches. Hidden sections release their feed space. These choices are saved with the selected page configuration and work with the theme turned off.
 - Home Shorts initially show one row. Show more reveals the additional cards; changing the column setting collapses the shelf again.

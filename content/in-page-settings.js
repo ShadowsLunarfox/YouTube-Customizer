@@ -107,12 +107,20 @@
     async function open() {
       if (disposed || dialog?.open) return;
       const revision = ++opening; previousFocus = document.activeElement; closing = false; backdropPointer = false;
-      await menuTheme.ready; if (disposed || revision !== opening) return;
       if (!dialog) buildDialog(); else mountDialog();
       const root = shell.shadowRoot;
       root.querySelector('#loading').hidden = false; delete root.querySelector('#loading').dataset.error;
       root.querySelector('#loading-close').hidden = false; localize();
       dialog.showModal(); button?.setAttribute('aria-expanded', 'true');
+      // Paint the shell before starting the authenticated frame and its form.
+      // A preference read or media initialization must not hold up this click.
+      await new Promise(resolve => {
+        let paint;
+        const done = () => { clearTimeout(timer); cancelAnimationFrame(paint); resolve(); };
+        let timer = setTimeout(done, 80);
+        paint = requestAnimationFrame(() => { clearTimeout(timer); timer = setTimeout(done, 0); });
+      });
+      if (disposed || revision !== opening || !dialog.open) return;
       try {
         const session = await YTCustomizer.sendRuntimeMessage({ type: 'YT_SETTINGS_EMBED_START' });
         if (disposed || revision !== opening || !dialog.open) {
@@ -136,8 +144,9 @@
       }
     }
     function finishClose(restoreFocus = true) {
-      opening++; clearTimeout(loadTimer); frame?.remove(); frame = null; ready = false; closing = false; backdropPointer = false;
+      opening++; clearTimeout(loadTimer); ready = false; closing = false; backdropPointer = false;
       if (dialog?.open) dialog.close(); button?.setAttribute('aria-expanded', 'false');
+      frame?.remove(); frame = null;
       if (token) void YTCustomizer.sendRuntimeMessage({ type: 'YT_SETTINGS_EMBED_END', token }).catch(() => {});
       token = ''; secret = '';
       if (restoreFocus) { if (entry?.isConnected) button.focus({ preventScroll: true }); else if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true }); }

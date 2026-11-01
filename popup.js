@@ -39,6 +39,7 @@ let pageAssets = {};
 let editingScope = "shared";
 let previewTabScope = "shared";
 let storageWriteQueue = Promise.resolve();
+let persistedSettings = '', persistedProfiles = '';
 let activeTab = "appearance";
 let saveTimer;
 let statusTimer;
@@ -56,11 +57,11 @@ let configurationStale = false;
 let configurationRevision = 0;
 const staleConfigurationKeys = new Set();
 let previewSettings = {};
-let previewIconData;
 let previewAudioMessage;
 let previewVideoData = "";
-let previewImageData = "";
-let previewImageUrl = "";
+let previewMediaSettings = {}, previewMediaRevision = 0;
+let previewMediaReady = Promise.resolve();
+const previewIcon = createPreviewBlobCache(), previewWallpaper = createPreviewBlobCache();
 const windowParameters = new URLSearchParams(location.search);
 const isSettingsWindow = windowParameters.get("window") === "1";
 const isFramed = window !== window.top;
@@ -255,6 +256,8 @@ async function loadStoredConfiguration() {
   sharedAssets = normalizeAssets(local);
   sharedSettings = normalize(settings);
   pageProfiles = normalizeProfiles(local.pageProfiles);
+  persistedSettings = JSON.stringify(sharedSettings);
+  persistedProfiles = JSON.stringify(pageProfiles);
   pageAssets = normalizePageAssets(local.pageAssets);
   if (configurationRevision === revision) staleConfigurationKeys.clear();
   configurationStale = staleConfigurationKeys.size > 0;
@@ -435,10 +438,6 @@ function updatePreview(settings = readForm()) {
   preview.style.setProperty("--heatmap-color", settings.heatmapColor);
   preview.style.setProperty("--bar-height", "calc(" + settings.barHeight + " * var(--ui-unit))");
   preview.style.setProperty("--thumb-size", "calc(" + settings.thumbSize + " * var(--ui-unit))");
-  if (previewSettings.thumbStyle !== settings.thumbStyle || previewSettings.thumbColor !== settings.thumbColor || previewIconData !== assets.customIconData) {
-    previewThumb.style.backgroundImage = 'url("' + iconDataUri(settings.thumbStyle, settings.thumbColor, assets.customIconData) + '")';
-    previewIconData = assets.customIconData;
-  }
   fields.thumbColor.disabled = settings.thumbStyle === "custom";
 
   const theme = settings.themeEnabled ? settings : DEFAULT_SETTINGS;
@@ -450,44 +449,9 @@ function updatePreview(settings = readForm()) {
   const withImage = settings.themeEnabled && settings.backgroundMode === "image" &&
     assets.backgroundImageData && !videoBackground;
   const withVideo = settings.themeEnabled && settings.backgroundMode === "image" && videoBackground;
-  if (withImage && previewImageData !== assets.backgroundImageData) {
-    const data = assets.backgroundImageData;
-    const binary = atob(data.slice(data.indexOf(",") + 1));
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const url = URL.createObjectURL(new Blob([bytes], { type: data.slice(5, data.indexOf(";")) }));
-    if (previewImageUrl) URL.revokeObjectURL(previewImageUrl);
-    previewImageUrl = url;
-    previewImageData = data;
-  } else if (!withImage && previewImageUrl) {
-    URL.revokeObjectURL(previewImageUrl);
-    previewImageUrl = "";
-    previewImageData = "";
-  }
-  themePreview.style.backgroundImage = withImage && previewImageUrl
-    ? 'linear-gradient(color-mix(in srgb, ' + settings.pageColor + ' ' + (100 - settings.backgroundOpacity) + '%, transparent), color-mix(in srgb, ' + settings.pageColor + ' ' + (100 - settings.backgroundOpacity) + '%, transparent)), url("' + previewImageUrl + '")'
-    : "none";
-  themePreview.style.backgroundSize = settings.backgroundFit === "tile" ? "auto, 32px" : settings.backgroundFit;
-  themePreview.style.backgroundRepeat = settings.backgroundFit === "tile" ? "repeat" : "no-repeat";
-  if (withVideo) {
-    if (previewVideoData !== assets.backgroundImageData) {
-      previewVideoData = assets.backgroundImageData;
-      silenceVideo(themePreviewVideo);
-      themePreviewVideo.src = previewVideoData;
-    }
-    themePreviewVideo.style.objectFit = settings.backgroundFit;
-    themePreviewVideo.style.opacity = String(settings.backgroundOpacity / 100);
-    themePreviewVideo.hidden = false;
-    if (themePreviewVideo.paused) void themePreviewVideo.play().catch(() => {});
-  } else {
-    if (!themePreviewVideo.paused) themePreviewVideo.pause();
-    themePreviewVideo.hidden = true;
-    if (!videoBackground && previewVideoData) {
-      previewVideoData = "";
-      themePreviewVideo.removeAttribute("src");
-      themePreviewVideo.load();
-    }
-  }
+  schedulePreviewMedia({ thumbStyle:settings.thumbStyle, thumbColor:settings.thumbColor, customIconData:assets.customIconData,
+    withImage:Boolean(withImage), withVideo, videoBackground, backgroundImageData:assets.backgroundImageData,
+    pageColor:settings.pageColor, backgroundOpacity:settings.backgroundOpacity, backgroundFit:settings.backgroundFit });
   themePreset.value = !settings.themeEnabled ? "original" :
     Object.keys(presets).find(name => Object.entries(presets[name]).every(([key, value]) => settings[key] === value)) || "custom";
   fields.thumbStyle.querySelector('[value="custom"]').disabled = !assets.customIconData;
@@ -500,6 +464,84 @@ function updatePreview(settings = readForm()) {
     fields[key].disabled = !assets.backgroundImageData || settings.backgroundMode !== "image";
   }
   previewSettings = settings;
+}
+
+// Chunked local decoding and short Blob URLs avoid multi-MB CSS declarations.
+// Each cache owns one source; stale asynchronous results are revoked immediately.
+function createPreviewBlobCache() {
+  let source = '', url = '', pending, revision = 0;
+  const clear = () => { revision++; source = ''; pending = undefined; if (url) URL.revokeObjectURL(url); url = ''; };
+  return { clear, get(data) {
+    if (source !== data || !pending) {
+      clear(); source = data; const generation = revision;
+      pending = (async () => {
+        const comma = data.indexOf(','), payload = data.slice(comma + 1), parts = [], chunkSize = 256 * 1024;
+        for (let offset = 0; offset < payload.length; offset += chunkSize) {
+          if (audioMeterClosed || generation !== revision) return '';
+          const chunk = payload.slice(offset, offset + chunkSize);
+          if (Uint8Array.fromBase64) parts.push(Uint8Array.fromBase64(chunk));
+          else {
+            const binary = atob(chunk), bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            parts.push(bytes);
+          }
+          if (offset + chunkSize < payload.length) {
+            if (globalThis.scheduler?.yield) await scheduler.yield();
+            else await new Promise(resolve => setTimeout(resolve, 0));
+          }
+        }
+        if (audioMeterClosed || generation !== revision) return '';
+        url = URL.createObjectURL(new Blob(parts, {type:data.slice(5, data.indexOf(';')).toLowerCase()}));
+        return url;
+      })();
+    }
+    return pending;
+  }};
+}
+
+function schedulePreviewMedia(next) {
+  if (Object.keys(next).every(key => next[key] === previewMediaSettings[key])) return;
+  previewMediaSettings = next; const revision = ++previewMediaRevision;
+  previewMediaReady = new Promise(resolve => {
+    let paint, timer;
+    const run = () => { clearTimeout(timer); cancelAnimationFrame(paint); resolve(); };
+    timer = setTimeout(run, 80);
+    paint = requestAnimationFrame(() => { clearTimeout(timer); timer = setTimeout(run, 0); });
+  }).then(async () => {
+    if (audioMeterClosed || revision !== previewMediaRevision) return;
+    const iconData = iconDataUri(next.thumbStyle, next.thumbColor, next.customIconData);
+    const [icon, wallpaper] = await Promise.all([
+      next.thumbStyle === 'custom' ? previewIcon.get(iconData) : iconData,
+      next.withImage ? previewWallpaper.get(next.backgroundImageData) : ''
+    ]);
+    if (audioMeterClosed || revision !== previewMediaRevision) return;
+    const iconImage = 'url("' + icon + '")';
+    if (previewThumb.style.backgroundImage !== iconImage) previewThumb.style.backgroundImage = iconImage;
+    if (next.thumbStyle !== 'custom') previewIcon.clear();
+    if (!next.withImage) previewWallpaper.clear();
+    themePreview.style.backgroundImage = next.withImage && wallpaper
+      ? 'linear-gradient(color-mix(in srgb, ' + next.pageColor + ' ' + (100 - next.backgroundOpacity) + '%, transparent), color-mix(in srgb, ' + next.pageColor + ' ' + (100 - next.backgroundOpacity) + '%, transparent)), url("' + wallpaper + '")' : 'none';
+    themePreview.style.backgroundSize = next.backgroundFit === 'tile' ? 'auto, 32px' : next.backgroundFit;
+    themePreview.style.backgroundRepeat = next.backgroundFit === 'tile' ? 'repeat' : 'no-repeat';
+    if (next.withVideo) {
+      if (previewVideoData !== next.backgroundImageData) {
+        previewVideoData = next.backgroundImageData; silenceVideo(themePreviewVideo); themePreviewVideo.src = previewVideoData;
+      }
+      themePreviewVideo.style.objectFit = next.backgroundFit;
+      themePreviewVideo.style.opacity = String(next.backgroundOpacity / 100);
+      themePreviewVideo.hidden = false;
+    } else {
+      themePreviewVideo.hidden = true;
+      if (!next.videoBackground && previewVideoData) { previewVideoData = ''; themePreviewVideo.removeAttribute('src'); themePreviewVideo.load(); }
+    }
+    syncPreviewVideoPlayback();
+  }).catch(() => { if (!audioMeterClosed && revision === previewMediaRevision) showStatus('Could not read file', true); });
+}
+
+function syncPreviewVideoPlayback() {
+  if (initialized && !audioMeterClosed && activeTab === 'appearance' && !document.hidden && !themePreviewVideo.hidden) {
+    if (themePreviewVideo.paused) void themePreviewVideo.play().catch(() => {});
+  } else if (!themePreviewVideo.paused) themePreviewVideo.pause();
 }
 
 function updateAudioStatus(status) {
@@ -573,11 +615,13 @@ function syncAudioMonitor() {
 }
 
 document.addEventListener("visibilitychange", syncAudioMonitor);
+document.addEventListener("visibilitychange", syncPreviewVideoPlayback);
 
 window.addEventListener("pagehide", () => {
   audioMeterClosed = true;
+  previewMediaRevision++;
   syncAudioMonitor();
-  if (previewImageUrl) URL.revokeObjectURL(previewImageUrl);
+  syncPreviewVideoPlayback(); previewIcon.clear(); previewWallpaper.clear();
 });
 
 function showStatus(message = "Saved", isError = false, respectPreview = true) {
@@ -690,9 +734,10 @@ async function saveSettings(message = "Saved") {
   if (previewFrame !== undefined) flushSettingsPreview();
   captureForm();
   const settings = { ...sharedSettings }, profiles = normalizeProfiles(pageProfiles);
+  const settingsKey = JSON.stringify(settings), profilesKey = JSON.stringify(profiles);
   const write = storageWriteQueue.then(async () => {
-    await chrome.storage.sync.set(settings);
-    await chrome.storage.local.set({ pageProfiles: profiles });
+    if (settingsKey !== persistedSettings) { await chrome.storage.sync.set(settings); persistedSettings = settingsKey; }
+    if (profilesKey !== persistedProfiles) { await chrome.storage.local.set({ pageProfiles: profiles }); persistedProfiles = profilesKey; }
   });
   storageWriteQueue = write.catch(() => {});
   try {
@@ -742,6 +787,7 @@ function activateTab(tab, focus = false) {
   if (initialized && activeTab === 'shortcuts') void updateShortcuts();
   bookmarkStats.setVisible(initialized && activeTab === 'records');
   syncAudioMonitor();
+  syncPreviewVideoPlayback();
 }
 
 const sideNavigation = matchMedia('(min-width: 760px) and (min-height: 761px)');
@@ -991,6 +1037,8 @@ document.getElementById("backupFile").addEventListener("change", async event => 
     }
     sharedSettings = backup.settings;
     pageProfiles = backup.pageProfiles;
+    persistedSettings = JSON.stringify(sharedSettings);
+    persistedProfiles = JSON.stringify(pageProfiles);
     if (backup.assets) sharedAssets = backup.assets;
     if (backup.pageAssets !== undefined) pageAssets = backup.pageAssets;
     lastSentAssets = {};

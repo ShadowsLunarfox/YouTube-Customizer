@@ -27,14 +27,34 @@ const fixture = `<!doctype html><html><head><style>
   .ytSearchboxComponentSuggestionsContainer { position:absolute; top:44px; left:0; width:632px; height:216px;
     border-radius:12px; background:#202020; padding:16px; box-shadow:0 2px 8px #0008; }
   [hidden] { display:none !important; }
-  #suggestion { background:transparent; color:inherit; border:0; cursor:pointer; font:16px sans-serif; }
+  .ytSuggestionComponentSuggestion { display:flex; align-items:center; justify-content:space-between; height:44px; border-radius:8px; }
+  .ytSuggestionComponentSuggestionHover:hover, .ytSuggestionComponentHighlighted { background:rgba(255,255,255,.1); }
+  .ytSuggestionComponentText { display:flex; align-items:center; }
+  .ytSuggestionComponentIcon { margin-right:14px; }
+  .ytSuggestionComponentLeftContainer { display:flex; flex-direction:column; }
+  .ytSuggestionComponentRightContainer { display:flex; align-items:center; gap:8px; }
+  .ytSuggestionComponentThumbnailContainer { position:relative; width:44px; height:24px; }
+  .ytSuggestionComponentVisualSuggestThumbnail { width:44px; height:24px; border-radius:4px; }
+  .ytSuggestionComponentThumbnailOverlay { position:absolute; inset:0; background:rgba(0,0,0,.4); }
+  #suggestion { cursor:pointer; font:16px sans-serif; }
 </style></head><body><ytd-app class="with-chipbar"><div id="masthead-container"><ytd-masthead>
   <div id="background"></div><div id="container"><div id="center"><yt-searchbox id="search">
     <div class="ytSearchboxComponentInputWrapper"><div class="ytSearchboxComponentInputContainer">
       <div class="ytSearchboxComponentInputBox"><form><input type="text" aria-label="Search" placeholder="Search" autocomplete="off"></form></div>
       <button class="ytSearchboxComponentSearchButton" aria-label="Submit search">⌕</button>
     </div></div>
-    <div class="ytSearchboxComponentSuggestionsContainer" hidden><button id="suggestion">Example suggestion</button></div>
+    <div class="ytSearchboxComponentSuggestionsContainer" role="listbox" hidden>
+      <div class="ytSuggestionComponentSuggestion ytSuggestionComponentSuggestionHover" role="presentation">
+        <div class="ytSuggestionComponentText" role="option" id="searchbox-suggestion:0">
+          <span class="ytSuggestionComponentIcon">⌕</span>
+          <div class="ytSuggestionComponentLeftContainer"><span id="suggestion" role="button" tabindex="0"><span>Example </span><span class="ytSuggestionComponentBold">suggestion</span></span></div>
+        </div>
+        <div class="ytSuggestionComponentRightContainer">
+          <div class="ytSuggestionComponentThumbnailContainer"><img class="ytSuggestionComponentVisualSuggestThumbnail" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='24'%3E%3Cpath fill='%2355aa88' d='M0 0h44v24H0z'/%3E%3C/svg%3E"><span class="ytSuggestionComponentThumbnailOverlay"></span></div>
+          <button class="ytSuggestionComponentRemoveLinkClearButton" aria-label="Remove suggestion">×</button>
+        </div>
+      </div>
+    </div>
   </yt-searchbox></div></div>
 </ytd-masthead></div></ytd-app><script>
   const input = document.querySelector('input');
@@ -95,7 +115,7 @@ const fixture = `<!doctype html><html><head><style>
         backgroundOpacity: 100, uiOpacity: 30, uiBlur: 0, surfaceColor: "#212121" });
     });
     await page.bringToFront();
-    const tracked = "ytd-masthead, ytd-masthead #background, .ytSearchboxComponentInputContainer, .ytSearchboxComponentInputBox, .ytSearchboxComponentSearchButton, .ytSearchboxComponentSuggestionsContainer";
+    const tracked = "ytd-masthead, ytd-masthead #background, .ytSearchboxComponentInputContainer, .ytSearchboxComponentInputBox, .ytSearchboxComponentSearchButton, .ytSearchboxComponentSuggestionsContainer, #suggestion, .ytSuggestionComponentThumbnailOverlay";
     const snapshot = () => page.locator(tracked).evaluateAll(elements => elements.map(element => {
       const style = getComputedStyle(element);
       return { background: style.backgroundColor, backdrop: style.backdropFilter, radius: style.borderRadius,
@@ -137,6 +157,16 @@ const fixture = `<!doctype html><html><head><style>
         });
       }, { opacity, unifiedFocused });
     }
+    async function verifySuggestionLabel() {
+      assert.deepEqual(await page.locator('#suggestion').evaluate(element => {
+        const style = getComputedStyle(element);
+        return { background: style.backgroundColor, backdrop: style.backdropFilter, shadow: style.boxShadow,
+          managed: element.hasAttribute('data-ytc-universal-glass') };
+      }), { background: 'rgba(0, 0, 0, 0)', backdrop: 'none', shadow: 'none', managed: false },
+      'suggestion text uses the shared popup instead of receiving a dark button tile');
+      assert.equal(await page.locator('.ytSuggestionComponentThumbnailOverlay').evaluate(element =>
+        getComputedStyle(element).backgroundColor), 'rgba(0, 0, 0, 0.4)', 'thumbnail overlays keep their native background');
+    }
     async function pixels() {
       const png = await page.screenshot();
       return page.evaluate(async data => {
@@ -168,6 +198,20 @@ const fixture = `<!doctype html><html><head><style>
       "the unused left margin has no rectangular paint: " + JSON.stringify(idlePixels));
     await open();
     await verifyTint(30);
+    await verifySuggestionLabel();
+    await page.locator('#suggestion').hover();
+    assert.equal(await page.locator('#suggestion').evaluate(element => getComputedStyle(element).outlineStyle), 'none',
+      'hover does not draw a button outline around the text');
+    assert.equal(await page.locator('.ytSuggestionComponentSuggestion').evaluate(element =>
+      getComputedStyle(element).backgroundColor), 'rgba(255, 255, 255, 0.1)', 'the native whole-row hover remains visible');
+    await page.mouse.move(0, 400);
+    await page.locator('.ytSuggestionComponentSuggestion').evaluate(element => element.classList.add('ytSuggestionComponentHighlighted'));
+    assert.equal(await page.locator('.ytSuggestionComponentSuggestion').evaluate(element =>
+      getComputedStyle(element).backgroundColor), 'rgba(255, 255, 255, 0.1)', 'keyboard selection keeps its whole-row highlight');
+    await verifySuggestionLabel();
+    await page.locator('.ytSuggestionComponentSuggestion').evaluate(element => element.classList.remove('ytSuggestionComponentHighlighted'));
+    assert.equal(await page.locator('.ytSuggestionComponentRemoveLinkClearButton').evaluate(element =>
+      element.hasAttribute('data-ytc-universal-glass')), true, 'the separate remove button retains its button styling');
     assert.equal(await input.inputValue(), "example", "the focused field remains editable");
     await close();
 
@@ -181,6 +225,7 @@ const fixture = `<!doctype html><html><head><style>
           await verifyTint(opacity);
           await open();
           await verifyTint(opacity, unified);
+          await verifySuggestionLabel();
           await close();
           await verifyTint(opacity);
         }
@@ -226,7 +271,7 @@ const fixture = `<!doctype html><html><head><style>
     await page.locator(".ytSearchboxComponentInputBox").evaluate(element => element.style.removeProperty("background"));
     assert.deepEqual(await snapshot(), original, "disabling the theme restores the native search and header appearance");
     assert.deepEqual(errors, [], "the fixture has no page errors");
-    console.log("PASS: rounded search geometry, standard/unified focus, opacity 0/30/100, blur 0/12/24, native repaints, autocomplete clicks/reopening, visible header/suggestion frost, and theme restoration.");
+    console.log("PASS: rounded search geometry, standard/unified focus, clear suggestion labels, row hover/selection, native thumbnails, opacity 0/30/100, blur 0/12/24, native repaints, autocomplete clicks/reopening, visible header/suggestion frost, and theme restoration.");
   } finally {
     clearTimeout(deadline);
     await context.close();

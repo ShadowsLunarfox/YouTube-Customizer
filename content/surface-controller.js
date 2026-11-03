@@ -28,10 +28,14 @@
     '[role="button"]:not([href^="/watch"], [href^="/shorts/"]), ' +
     '[role="tab"], [role="menuitem"], [role="menuitemradio"], [role="menuitemcheckbox"]';
   const BUTTON_MATCH_SELECTOR = `:is(${BUTTON_ELEMENTS})`;
+  // Autocomplete labels expose role="button" for activation, but the suggestion
+  // row owns their background and highlight. Painting the label makes a dark tile.
+  const SEARCH_SUGGESTION_LABEL_SELECTOR = '.ytSuggestionComponentSuggestion .ytSuggestionComponentText [role="button"]';
   const BUTTON_EXCLUSIONS = PLAYER_SCOPE_SELECTOR + ', .html5-video-container, video, img, canvas, iframe, ' +
     '.ytp-scrubber-button, .ytp-progress-bar, .ytp-cued-thumbnail-overlay, [data-ytc-bookmark-pin], ' +
     'ytd-thumbnail, yt-thumbnail-view-model, .ytThumbnailViewModelHost, ' +
-    '.ytLockupViewModelContentImage, .yt-lockup-view-model__content-image, ' + COMMENT_AVATAR_SELECTOR;
+    '.ytLockupViewModelContentImage, .yt-lockup-view-model__content-image, ' + COMMENT_AVATAR_SELECTOR + ', ' +
+    SEARCH_SUGGESTION_LABEL_SELECTOR;
   const BUTTON_SURFACE_SELECTOR = `${BUTTON_MATCH_SELECTOR}:not(:has(${BUTTON_MATCH_SELECTOR})):not(:where(${BUTTON_EXCLUSIONS}))`;
   const BUTTON_WRAPPER_SELECTOR = `${BUTTON_MATCH_SELECTOR}:has(${BUTTON_MATCH_SELECTOR}):not(:where(${BUTTON_EXCLUSIONS}, ` +
     'yt-chip-cloud-chip-renderer, .html5-video-player.ytp-delhi-modern.ytp-delhi-horizontal-volume-controls .ytp-volume-area, ' +

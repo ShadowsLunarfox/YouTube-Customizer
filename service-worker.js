@@ -118,7 +118,7 @@ chrome.runtime.onMessage.addListener((message, sender, reply) => {
 
 chrome.tabs.onRemoved.addListener(tabId => { void chrome.storage.session.remove('inPageSettings:' + tabId).catch(() => {}); });
 
-// The browser icon and its existing shortcut now open the same in-page menu.
+// Page-default shortcuts use the in-page menu; the browser icon uses default_popup.
 async function openPageSettings(tab) {
   if (!tab?.id || !YTCustomizer.isYouTubeUrl(tab.url)) {
     await chrome.windows.create({ url: chrome.runtime.getURL('popup.html?window=1'), type: 'popup', width: 520, height: 760 });
@@ -132,7 +132,6 @@ async function openPageSettings(tab) {
   }
   await chrome.tabs.sendMessage(tab.id, { type: 'YT_SETTINGS_TOGGLE' }, { frameId: 0 });
 }
-chrome.action.onClicked.addListener(tab => { void openPageSettings(tab).catch(() => notifyShortcut(tab.id, 'Could not open settings. Refresh YouTube and try again.').catch(() => {})); });
 
 // A worker owns each record's writes so simultaneous tabs do not lose bookmarks.
 const bookmarkQueues = new Map();

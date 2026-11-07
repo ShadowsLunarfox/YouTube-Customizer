@@ -33,18 +33,16 @@ body{margin:0;background:#181818;color:white;font:14px Arial}ytd-app{display:blo
   assert.equal(await stored(),initialStored,'opening the dialog changes no saved appearance');
   assert.deepEqual(await page.evaluate(()=>({style:appearance.style===document.querySelector('#yt-custom-progress-style'),css:appearance.css===document.querySelector('#yt-custom-progress-style').textContent,image:appearance.image===document.querySelector('#ytc-background-image'),avatar:avatar===document.querySelector('#avatar-btn')})),{style:true,css:true,image:true,avatar:true});
   assert.equal(await view.locator('#closeInPage').isVisible(),true);assert.equal(await view.locator('#openWindow').isVisible(),true);
-  // Verify real composited glass through the cross-origin iframe, including blur across an edge.
-  // A CSS filter alone would pass even if an opaque iframe hid the page completely.
-  const glassBox=await dialog.boundingBox(),probe={x:Math.floor(glassBox.x+50),y:Math.floor(glassBox.y+glassBox.height-150),width:1,height:1};
-  await page.evaluate(()=>{const e=document.createElement('div');e.id='menu-glass-witness';e.style.cssText='position:fixed;inset:0;z-index:2147483000;pointer-events:none;background:rgb(20,90,210)';document.body.append(e)});
-  async function sampleGlass(){const png=await page.screenshot();return admin.evaluate(async({url,x,y})=>{const img=new Image();img.src=url;await img.decode();const c=document.createElement('canvas');c.width=c.height=1;const ctx=c.getContext('2d');ctx.drawImage(img,-x,-y);return [...ctx.getImageData(0,0,1,1).data].slice(0,3)},{url:'data:image/png;base64,'+png.toString('base64'),x:probe.x,y:probe.y})}
-  const blue=await sampleGlass();await page.locator('#menu-glass-witness').evaluate(e=>e.style.background='rgb(220,70,100)');const coral=await sampleGlass();
-  const delta=coral.map((v,i)=>v-blue[i]),length=delta.reduce((s,v)=>s+v*v,0);assert.ok(length>500,'page colors remain visible through the menu and iframe');
-  await page.locator('#menu-glass-witness').evaluate((e,edge)=>e.style.background=`linear-gradient(90deg,rgb(20,90,210) ${edge}px,rgb(220,70,100) ${edge}px)`,probe.x+10);
-  const mixed=await sampleGlass(),fraction=mixed.reduce((s,v,i)=>s+(v-blue[i])*delta[i],0)/length;
-  assert.ok(fraction>.12&&fraction<.48,'the page edge is blurred behind the transparent menu: '+JSON.stringify({blue,coral,mixed,fraction}));
-  await page.locator('#menu-glass-witness').evaluate(e=>e.style.background='radial-gradient(ellipse at 20% 65%,#476cc9 0,transparent 65%),radial-gradient(ellipse at 85% 25%,#e66c92 0,transparent 65%),#afc9cb');
-  await page.screenshot({path:path.join(os.tmpdir(),'ytc-settings-frosted-glass.png')});await page.locator('#menu-glass-witness').evaluate(e=>e.remove());
+  // Underlying page colors and edges must never show through the settings canvas.
+  const menuBox=await dialog.boundingBox(),probe={x:Math.floor(menuBox.x+50),y:Math.floor(menuBox.y+menuBox.height-150)};
+  await page.evaluate(()=>{const e=document.createElement('div');e.id='menu-background-witness';e.style.cssText='position:fixed;inset:0;z-index:2147483000;pointer-events:none;background:rgb(20,90,210)';document.body.append(e)});
+  async function sampleMenu(){const png=await page.screenshot();return admin.evaluate(async({url,x,y})=>{const img=new Image();img.src=url;await img.decode();const c=document.createElement('canvas');c.width=c.height=1;const ctx=c.getContext('2d');ctx.drawImage(img,-x,-y);return [...ctx.getImageData(0,0,1,1).data].slice(0,3)},{url:'data:image/png;base64,'+png.toString('base64'),x:probe.x,y:probe.y})}
+  const blue=await sampleMenu();await page.locator('#menu-background-witness').evaluate(e=>e.style.background='rgb(220,70,100)');const coral=await sampleMenu();
+  assert.deepEqual(coral,blue,'changing the page color does not tint the opaque menu');
+  await page.locator('#menu-background-witness').evaluate((e,edge)=>e.style.background=`linear-gradient(90deg,rgb(20,90,210) ${edge}px,rgb(220,70,100) ${edge}px)`,probe.x+10);
+  assert.deepEqual(await sampleMenu(),blue,'page edges are hidden rather than blurred through the menu');
+  assert.equal(await view.locator('html,body').evaluateAll(nodes=>nodes.every(el=>getComputedStyle(el).backgroundColor==='rgb(244, 247, 252)')),true,'embedded document uses the solid light canvas');
+  await page.screenshot({path:path.join(os.tmpdir(),'ytc-settings-solid-canvas.png')});await page.locator('#menu-background-witness').evaluate(e=>e.remove());
   // Parent-page messages cannot close or command the privileged settings view.
   await page.evaluate(()=>{const f=document.querySelector('ytc-settings-modal').shadowRoot.querySelector('iframe'),token=new URL(f.src).searchParams.get('token');postMessage({type:'YT_SETTINGS_CLOSE',token},location.origin);postMessage({type:'YT_PROGRESS_LIVE_PREVIEW',settings:{uiOpacity:99}},location.origin)});
   assert.equal(await dialog.isVisible(),true);assert.equal(await stored(),initialStored);
@@ -74,18 +72,47 @@ body{margin:0;background:#181818;color:white;font:14px Arial}ytd-app{display:blo
   await view.locator('#menuTheme').selectOption('auto');await view.waitForFunction(()=>document.documentElement.dataset.menuTheme==='dark');await page.emulateMedia({colorScheme:'light'});await view.waitForFunction(()=>document.documentElement.dataset.menuTheme==='light');
   await view.locator('#menuTheme').selectOption('dark');await view.waitForFunction(()=>document.documentElement.dataset.menuTheme==='dark');await admin.waitForFunction(()=>document.documentElement.dataset.menuTheme==='dark');
   assert.equal(await view.locator('html').evaluate(e=>getComputedStyle(e).color),'rgb(233, 237, 245)');
+  assert.deepEqual(await dialog.evaluate(el=>({background:getComputedStyle(el).backgroundColor,blur:getComputedStyle(el).backdropFilter,paint:getComputedStyle(el,'::before').content})),{background:'rgb(20, 24, 33)',blur:'none',paint:'none'},'dark menu has a solid background and no glass layer');
+  assert.equal(await view.locator('html,body').evaluateAll(nodes=>nodes.every(el=>getComputedStyle(el).backgroundColor==='rgb(20, 24, 33)'&&getComputedStyle(el).backdropFilter==='none')),true,'embedded document uses the solid dark canvas without blur');
+  assert.equal(await view.locator('.tabs button').evaluateAll(nodes=>nodes.every(el=>getComputedStyle(el).appearance==='none')),true,'transparent category buttons use only the CSS surface');
+  await page.evaluate(()=>{const e=document.createElement('div');e.id='menu-flat-probe';e.style.cssText='position:fixed;inset:0;z-index:2147483000;pointer-events:none;background:#a8a800';document.body.append(e)});
+  async function uniformMenuBackground(label){
+    const frameBox=await modal.locator('iframe').boundingBox();
+    const points=await view.evaluate(()=>{
+      const points=[{label:'canvas',x:8,y:innerHeight/2}];
+      for(const button of document.querySelectorAll('.tabs button:not([aria-selected="true"])')){const r=button.getBoundingClientRect();points.push({label:button.id,x:r.right-12,y:r.y+r.height/2})}
+      const r=document.querySelector('.tab-content').getBoundingClientRect();
+      for(const fraction of [.05,.5,.9])points.push({label:'scroll-padding-'+fraction,x:r.x+3,y:r.y+r.height*fraction});
+      return points.filter(p=>p.x>0&&p.x<innerWidth&&p.y>0&&p.y<innerHeight);
+    });
+    await page.mouse.move(page.viewportSize().width-1,page.viewportSize().height-1);
+    const png=await page.screenshot();
+    const pixels=await admin.evaluate(async({url,points,viewportWidth})=>{
+      const image=new Image();image.src=url;await image.decode();const canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;
+      const context=canvas.getContext('2d');context.drawImage(image,0,0);const scale=image.width/viewportWidth;
+      return points.map(p=>({label:p.label,rgb:[...context.getImageData(Math.round(p.x*scale),Math.round(p.y*scale),1,1).data].slice(0,3)}));
+    },{url:'data:image/png;base64,'+png.toString('base64'),viewportWidth:page.viewportSize().width,points:points.map(p=>({...p,x:p.x+frameBox.x,y:p.y+frameBox.y}))});
+    const reference=pixels[0].rgb;
+    for(const pixel of pixels)assert.ok(pixel.rgb.every((value,i)=>Math.abs(value-reference[i])<=3),label+': no separate dark tile at '+JSON.stringify(pixel)+'; canvas '+reference);
+  }
   for(const panel of ['appearance','player','records','shortcuts','audio','layout','backup']){
     await view.locator('#tab-'+panel).click();
-    assert.equal(await view.locator('fieldset:visible').evaluateAll(nodes=>nodes.every(e=>getComputedStyle(e).backgroundColor==='rgba(0, 0, 0, 0)'&&getComputedStyle(e).boxShadow==='none')),true,'groups do not add overlapping glass layers');
+    assert.equal(await view.locator('fieldset:visible').evaluateAll(nodes=>nodes.every(e=>getComputedStyle(e).backgroundColor==='rgba(0, 0, 0, 0)'&&getComputedStyle(e).boxShadow==='none')),true,'groups share the solid menu canvas');
+    await uniformMenuBackground(panel+' top');
+    await view.locator('.tab-content').evaluate(el=>el.scrollTop=el.scrollHeight);
+    await uniformMenuBackground(panel+' scrolled');
+    await view.locator('.tab-content').evaluate(el=>el.scrollTop=0);
+    if(panel==='player'||panel==='backup')await dialog.screenshot({path:path.join(os.tmpdir(),'ytc-settings-uniform-'+panel+'.png')});
   }
+  await page.locator('#menu-flat-probe').evaluate(el=>el.remove());
   for(const selector of ['.panel','.title-bar','.scope-controls','.tabs'])assert.equal(await view.locator(selector).evaluate(e=>getComputedStyle(e).backgroundColor),'rgba(0, 0, 0, 0)');
   await view.locator('#tab-audio').click();
-  await page.evaluate(()=>{const e=document.createElement('div');e.id='menu-glass-stress';e.style.cssText='position:fixed;inset:0;z-index:2147483000;pointer-events:none;background:repeating-conic-gradient(#c00080 0 25%,#9db4c7 0 50%) 0/320px 240px';document.body.append(e)});
-  await page.screenshot({path:path.join(os.tmpdir(),'ytc-settings-dark-single-glass.png')});
-  await view.locator('#menuTheme').selectOption('light');await page.waitForFunction(()=>document.querySelector('ytc-settings-modal').shadowRoot.querySelector('dialog').dataset.menuTheme==='light');await page.screenshot({path:path.join(os.tmpdir(),'ytc-settings-light-single-glass.png')});
+  await page.evaluate(()=>{const e=document.createElement('div');e.id='menu-background-stress';e.style.cssText='position:fixed;inset:0;z-index:2147483000;pointer-events:none;background:repeating-conic-gradient(#c00080 0 25%,#9db4c7 0 50%) 0/320px 240px';document.body.append(e)});
+  await page.screenshot({path:path.join(os.tmpdir(),'ytc-settings-dark-solid.png')});
+  await view.locator('#menuTheme').selectOption('light');await page.waitForFunction(()=>document.querySelector('ytc-settings-modal').shadowRoot.querySelector('dialog').dataset.menuTheme==='light');await page.screenshot({path:path.join(os.tmpdir(),'ytc-settings-light-solid.png')});
   assert.equal(await view.locator('#reset').evaluate(e=>getComputedStyle(e).backgroundColor),'rgb(255, 255, 255)','theme switches do not retain dark button layers');
   assert.equal(await view.locator('#tab-audio').evaluate(e=>getComputedStyle(e).backgroundColor),'rgb(255, 240, 243)','the selected category updates without a lingering previous highlight');
-  await view.locator('#menuTheme').selectOption('dark');await page.waitForFunction(()=>document.querySelector('ytc-settings-modal').shadowRoot.querySelector('dialog').dataset.menuTheme==='dark');await page.locator('#menu-glass-stress').evaluate(e=>e.remove());
+  await view.locator('#menuTheme').selectOption('dark');await page.waitForFunction(()=>document.querySelector('ytc-settings-modal').shadowRoot.querySelector('dialog').dataset.menuTheme==='dark');await page.locator('#menu-background-stress').evaluate(e=>e.remove());
   await view.locator('#settingsSearch').fill('菜单主题');await view.locator('[data-setting-id="menuTheme"]').click();assert.equal(await view.locator('#menuTheme').evaluate(e=>e===document.activeElement),true);
   assert.deepEqual(await page.evaluate(()=>({style:menuThemeAppearance.style===document.querySelector('#yt-custom-progress-style'),css:menuThemeAppearance.css===document.querySelector('#yt-custom-progress-style').textContent,image:menuThemeAppearance.image===document.querySelector('#ytc-background-image')})),{style:true,css:true,image:true},'menu theme changes do not restart page effects');
   await view.locator('#closeInPage').click();await dialog.waitFor({state:'hidden'});view=await open();assert.equal(await view.locator('#menuTheme').inputValue(),'dark');assert.equal(await dialog.getAttribute('data-menu-theme'),'dark','reopening restores the persisted dark surface');
@@ -128,7 +155,7 @@ body{margin:0;background:#181818;color:white;font:14px Arial}ytd-app{display:blo
   await page.locator('#avatar-btn').click();await page.locator('#native-notifications').click();assert.deepEqual(await page.evaluate(()=>nativeClicks),{'avatar-btn':1,'native-notifications':1});
   await page.locator('ytd-masthead').evaluate(h=>{h.outerHTML=headerMarkup});await page.waitForFunction(()=>document.querySelector('ytc-settings-entry')?.nextElementSibling?.querySelector('#avatar-btn'));
   assert.equal(await entry.count(),1);await entry.evaluate(h=>h.remove());await entry.waitFor();assert.equal(await entry.count(),1);
-  // The old browser action routes into the same page dialog, including clean close.
+  // The page-default menu shortcut toggles the page dialog, including clean close.
   const worker=context.serviceWorkers()[0]||await context.waitForEvent('serviceworker');
   await worker.evaluate(tab=>openPageSettings(tab),own);await dialog.waitFor({state:'visible'});await page.waitForFunction(()=>document.querySelector('ytc-settings-modal').shadowRoot.querySelector('#loading').hidden);
   await worker.evaluate(tab=>openPageSettings(tab),own);await dialog.waitFor({state:'hidden'});
@@ -137,6 +164,6 @@ body{margin:0;background:#181818;color:white;font:14px Arial}ytd-app{display:blo
   // Music's account button uses the same placement.
   const music=await context.newPage();await music.goto('https://music.youtube.com/watch?v=menu');await music.waitForSelector('ytc-settings-entry');assert.equal(await music.locator('ytc-settings-entry').evaluate(h=>h.nextElementSibling.tagName),'YTMUSIC-SETTINGS-BUTTON');
   assert.deepEqual(errors,[]);
-  console.log('PASS: avatar entry, authenticated complete settings, pixel-verified single glass surface, system/light/dark themes with persistence and host/iframe/window sync, immediate highlight updates, no theme restart, search/Escape/pending saves, owner-tab binding, responsive 360–1920px and short windows, native header/SPA repair, detached-window handoff and Music placement.');
+  console.log('PASS: avatar entry, authenticated complete settings, pixel-verified opaque backgrounds without blur, system/light/dark themes with persistence and host/iframe/window sync, immediate highlight updates, no theme restart, search/Escape/pending saves, owner-tab binding, responsive 360–1920px and short windows, native header/SPA repair, detached-window handoff and Music placement.');
  }finally{clearTimeout(deadline);await context.close()}
 })().catch(e=>{console.error(e);process.exitCode=1});

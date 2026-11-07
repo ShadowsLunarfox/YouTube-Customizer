@@ -69,12 +69,11 @@
       const root = shell.attachShadow({ mode: 'open' });
       root.innerHTML = `<style>
         :host{all:initial}
-        dialog{--menu-glass:rgb(244 247 252 / 86%);--menu-fallback:#f4f7fc;--menu-ink:#263044;--menu-line:#56657f33;--menu-control:#fff;color-scheme:light;position:fixed;inset:0;margin:auto;box-sizing:border-box;width:clamp(480px,84vw,1080px);max-width:calc(100vw - 24px);height:94dvh;max-height:calc(100dvh - 24px);padding:0;border:1px solid var(--menu-line);border-radius:18px;background:var(--menu-glass);color:var(--menu-ink);box-shadow:0 24px 100px #101a3455;-webkit-backdrop-filter:blur(28px);backdrop-filter:blur(28px);overflow:hidden;overscroll-behavior:contain}
-        dialog[data-menu-theme="dark"]{--menu-glass:rgb(20 24 33 / 90%);--menu-fallback:#141821;--menu-ink:#e9edf5;--menu-line:#ffffff26;--menu-control:#292f3d;color-scheme:dark}
+        dialog{--menu-canvas:#f4f7fc;--menu-ink:#263044;--menu-line:#56657f33;--menu-control:#fff;color-scheme:light;position:fixed;inset:0;margin:auto;box-sizing:border-box;width:clamp(480px,84vw,1080px);max-width:calc(100vw - 24px);height:94dvh;max-height:calc(100dvh - 24px);padding:0;border:1px solid var(--menu-line);border-radius:18px;background:var(--menu-canvas);color:var(--menu-ink);box-shadow:0 24px 100px #101a3455;overflow:hidden;overscroll-behavior:contain}
+        dialog[data-menu-theme="dark"]{--menu-canvas:#141821;--menu-ink:#e9edf5;--menu-line:#ffffff26;--menu-control:#292f3d;color-scheme:dark}
         dialog::backdrop{background:#17203540}
-        iframe{display:block;box-sizing:border-box;border:0;width:100%;height:100%;background:transparent;color-scheme:inherit}
+        iframe{display:block;box-sizing:border-box;border:0;width:100%;height:100%;background:var(--menu-canvas);color-scheme:inherit}
         iframe[data-loading]{visibility:hidden}
-        @supports not (backdrop-filter:blur(1px)){dialog{background:var(--menu-fallback)}}
         #loading{position:absolute;inset:40% 24px auto;text-align:center;font:14px/1.5 'Segoe UI',Arial,sans-serif;color:var(--menu-ink)}
         #loading-close{position:absolute;right:12px;top:12px;width:32px;height:32px;border:1px solid var(--menu-line);border-radius:9px;background:var(--menu-control);color:var(--menu-ink);font:22px 'Segoe UI',Arial;cursor:pointer}
         #loading-close:hover{border-color:#dc3657}

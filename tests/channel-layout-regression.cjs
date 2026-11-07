@@ -41,6 +41,10 @@ const fixture = `<!doctype html><html><head><style>
   yt-page-header-renderer { height:140px; background:#222; }
   yt-page-header-view-model { padding:16px; }
   tp-yt-paper-tabs { height:48px; display:flex; gap:8px; align-items:center; }
+  tp-yt-app-toolbar { display:block; position:relative; }
+  #tabs-divider { position:absolute;bottom:0;left:0;right:0;border-bottom:1px solid #0003; }
+  #channel-header-shell[stuck] tp-yt-app-toolbar { background:#fff; box-shadow:0 1px #111; }
+  html[dark] #channel-header-shell[stuck] tp-yt-app-toolbar { background:#0f0f0f; }
   ytd-section-list-renderer { width:1600px; }
   ytd-item-section-renderer { margin-bottom:1px; }
   #music h2 { margin:0 0 12px; }
@@ -88,7 +92,7 @@ const fixture = `<!doctype html><html><head><style>
   <ytd-tabbed-page-header><div id="channel-header-shell">
     <yt-image-banner-view-model>Channel banner</yt-image-banner-view-model>
     <yt-page-header-renderer><yt-page-header-view-model>Channel profile</yt-page-header-view-model></yt-page-header-renderer>
-    <tp-yt-paper-tabs><button role="tab" aria-selected="true" id="home-tab">Home</button><button role="tab">Videos</button></tp-yt-paper-tabs>
+    <tp-yt-app-toolbar><div id="tabs-container"><div id="tabs-inner-container"><div id="tabs-divider"></div><tp-yt-paper-tabs><button role="tab" aria-selected="true" id="home-tab">Home</button><button role="tab">Videos</button></tp-yt-paper-tabs></div></div></tp-yt-app-toolbar>
   </div></ytd-tabbed-page-header>
   <ytd-two-column-browse-results-renderer><div id="primary"><ytd-section-list-renderer>
     <ytd-item-section-renderer id="music"><ytd-shelf-renderer><h2>Releases</h2>
@@ -101,12 +105,14 @@ const fixture = `<!doctype html><html><head><style>
   </ytd-section-list-renderer></div></ytd-two-column-browse-results-renderer>
   <ytd-rich-grid-renderer id="standalone"><div id="contents">${Array.from({length:12}, (_, index) => gridCard(index)).join('')}</div></ytd-rich-grid-renderer>
 </ytd-browse><ytd-item-section-renderer id="outside-section">Other page</ytd-item-section-renderer>
+<tp-yt-app-toolbar id="outside-toolbar" style="background:#151515">Other toolbar</tp-yt-app-toolbar>
 <ytd-browse page-subtype="home"><ytd-rich-grid-renderer id="outside-grid"><div id="contents"></div></ytd-rich-grid-renderer></ytd-browse>
 <div id="cinematics">Ambient decoration</div><ytd-popup-container><ytd-menu-popup-renderer id="popup" role="menu"><button role="menuitem">Menu item</button></ytd-menu-popup-renderer></ytd-popup-container>
 </ytd-app><script>
   document.querySelectorAll('.more').forEach(button => button.addEventListener('click', () => document.querySelector('#popup').classList.add('open')));
   document.addEventListener('keydown', e => { if(e.key === 'Escape') document.querySelector('#popup').classList.remove('open'); });
   document.querySelector('#home-tab').addEventListener('click', () => document.body.dataset.clickedTab = 'home');
+  addEventListener('scroll',()=>document.querySelector('#channel-header-shell').toggleAttribute('stuck',scrollY>200),{passive:true});
 </script></body></html>`;
 
 (async () => {
@@ -196,6 +202,18 @@ const fixture = `<!doctype html><html><head><style>
     assert.ok(await page.locator('[data-grid-card]').first().evaluate((el,width) => el.clientWidth>width,fullWidth),"the maximum videos-per-row setting still works");
     await popup.evaluate(() => chrome.storage.sync.set({videosPerRow:6}));
     await page.waitForFunction(() => getComputedStyle(document.querySelector('#standalone > #contents')).getPropertyValue('--ytc-grid-columns').trim()==='4');
+    for(const dark of [false,true]){
+      await page.evaluate(dark=>document.documentElement.toggleAttribute('dark',dark),dark);
+      for(const y of [0,500,0]){
+        await page.evaluate(y=>scrollTo(0,y),y);
+        await page.waitForFunction(stuck=>document.querySelector('#channel-header-shell').hasAttribute('stuck')===stuck,y>200);
+        const toolbar=await page.locator('#channel-header-shell tp-yt-app-toolbar').evaluate(el=>({bg:getComputedStyle(el).backgroundColor,shadow:getComputedStyle(el).boxShadow,blur:getComputedStyle(el).backdropFilter}));
+        assert.deepEqual(toolbar,{bg:'rgba(0, 0, 0, 0)',shadow:'none',blur:'none'},'native sticky toolbar stays clear before/after scrolling in both YouTube themes');
+        assert.equal(await page.locator('#tabs-divider').evaluate(el=>getComputedStyle(el).borderBottomColor),'rgba(0, 0, 0, 0)','no dark rim below the sticky tabs');
+      }
+    }
+    await page.evaluate(()=>document.documentElement.removeAttribute('dark'));
+    assert.equal(await page.locator('#outside-toolbar').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(21, 21, 21)','other toolbars keep their native background');
     for (const uiBlur of [12,0,30]) {
       await popup.evaluate(uiBlur => chrome.storage.sync.set({uiBlur}),uiBlur);
       await page.waitForFunction(uiBlur => document.documentElement.style.getPropertyValue("--ytc-ui-blur")===uiBlur+"px",uiBlur);
@@ -232,10 +250,13 @@ const fixture = `<!doctype html><html><head><style>
     await popup.evaluate(() => chrome.storage.sync.set({uiOpacity:0,uiBlur:0}));
     await page.waitForFunction(() => document.documentElement.style.getPropertyValue("--ytc-ui-opacity")==="0");
     assert.ok((await page.locator("#music").evaluate(el => getComputedStyle(el).backgroundColor)).endsWith(", 0)"));
+    await page.evaluate(()=>scrollTo(0,500));await page.waitForFunction(()=>document.querySelector('#channel-header-shell').hasAttribute('stuck'));
     await popup.evaluate(() => chrome.storage.sync.set({themeEnabled:false}));
     await page.waitForFunction(() => !document.documentElement.hasAttribute("data-ytc-theme"));
     assert.deepEqual(await page.locator("#music").evaluate(el => [getComputedStyle(el).padding,getComputedStyle(el).borderRadius]),original);
     assert.equal(await page.locator("#cinematics").evaluate(el => getComputedStyle(el).display),"block");
+    assert.equal(await page.locator('#channel-header-shell tp-yt-app-toolbar').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(255, 255, 255)','turning off the theme restores the native sticky strip');
+    assert.equal(await page.locator('#tabs-divider').evaluate(el=>getComputedStyle(el).borderBottomColor),'rgba(0, 0, 0, 0.2)','turning off the theme restores the native divider');
     assert.deepEqual(errors,[]);
     console.log("PASS: large responsive channel covers and separate clickable menus; live column limits; aligned headers, visible artwork, equal carousel heights, contained post controls, popups, dynamic cards, glass settings, scoping, and restoration.");
   } finally { clearTimeout(deadline); await context.close(); }

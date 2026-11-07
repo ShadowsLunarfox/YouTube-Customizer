@@ -266,6 +266,31 @@
       html body .ytp-hover-progress,
       html body .ytp-volume-slider-handle::before { background: ${settings.progressColor} !important; }
 
+      /* Keep native horizontal volume open without depending on hover classes. */
+      html body .html5-video-player .ytp-left-controls {
+        --ytc-native-volume-width: 52px;
+        --ytc-native-volume-gap: 3px;
+      }
+      html body .html5-video-player.ytp-big-mode .ytp-left-controls {
+        --ytc-native-volume-width: 78px;
+        --ytc-native-volume-gap: 5px;
+      }
+      html body .html5-video-player:is(:not(.ytp-delhi-modern), .ytp-delhi-horizontal-volume-controls)
+        .ytp-left-controls :is(.ytp-volume-panel, .ytp-volume-slider) {
+        width: var(--ytc-native-volume-width) !important;
+        min-width: var(--ytc-native-volume-width) !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        transition: none !important;
+      }
+      html body .html5-video-player:is(:not(.ytp-delhi-modern), .ytp-delhi-horizontal-volume-controls)
+        .ytp-left-controls .ytp-volume-panel {
+        margin-right: var(--ytc-native-volume-gap) !important;
+      }
+      html body .html5-video-player.ytp-delhi-horizontal-volume-controls .ytp-left-controls .ytp-volume-area {
+        padding-right: 16px !important;
+      }
+
       /* Keep the track centered and outside the white volume knob. */
       html body .html5-video-player .ytp-volume-slider-handle::before,
       html body .html5-video-player .ytp-volume-slider-handle::after {
@@ -1024,6 +1049,9 @@
   const shorts = isMusic ? null : runtime.createShortsController(() => surfaces.scheduleUniversalGlass(true));
   const homeShortsGrid = isMusic ? null : runtime.createHomeShortsGridController();
   const audio = runtime.createAudioController();
+  const volumeBoostControls = globalThis.YTCustomizerPlayerVolumeBoost?.createController(patch => {
+    applyConfiguration({ ...sharedSettings, ...patch });
+  });
   const pipButtons = globalThis.YTCustomizerPictureInPicture?.createController();
   let inPageSettings = settingsController || globalThis.YTCustomizerInPageSettings?.createController();
   if (settingsController) globalThis.YTCustomizerInPageSettings?.upgradeEntryIcons?.();
@@ -1057,6 +1085,7 @@
       Object.keys(DEFAULT_SETTINGS).every(key => ["uiOpacity", "uiBlur", "showVideoBookmarks", "useDefaultShortcuts", ...audioKeys].includes(key) || nextSettings[key] === currentSettings[key]);
     currentSettings = nextSettings;
     audio.sync(currentSettings);
+    volumeBoostControls?.sync(currentSettings);
     videoBookmarks?.sync(currentSettings);
     defaultShortcuts?.sync(currentSettings);
     if (!assetsUnchanged) currentAssets = normalizeAssets(assets);
@@ -1213,6 +1242,7 @@
     if (backgroundImageLayer && !backgroundImageLayer.isConnected) syncBackgroundImage();
     if (backgroundVideo && !backgroundVideo.isConnected) syncBackgroundVideo();
     pipButtons?.handleMutations(records);
+    volumeBoostControls?.handleMutations(records);
     inPageSettings?.handleMutations(records);
     videoBookmarks?.handleMutations(records);
     audio.handleMutations(records);
@@ -1279,6 +1309,7 @@
       shorts?.dispose();
       homeShortsGrid?.dispose();
       audio.dispose();
+      volumeBoostControls?.dispose();
       pipButtons?.dispose();
       inPageSettings?.dispose();
       videoBookmarks?.dispose();

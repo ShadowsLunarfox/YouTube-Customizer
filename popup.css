@@ -24,11 +24,12 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html, body { width: 480px; min-width: 480px; height: 600px; margin: 0; overflow: hidden; }
-body { font-size: 1rem; }
+body { max-height: 100vh; font-size: 1rem; background: var(--canvas); }
 button, input, select { font: inherit; color: inherit; }
 button, select, input { -webkit-tap-highlight-color: transparent; }
 svg { display: block; flex: none; width: calc(19 * var(--ui-unit)); height: calc(19 * var(--ui-unit)); }
 button {
+  appearance: none;
   min-width: 0; min-height: calc(34 * var(--ui-unit)); padding: calc(6 * var(--ui-unit)) calc(12 * var(--ui-unit));
   border: 1px solid var(--line); border-radius: calc(8 * var(--ui-unit)); background: var(--surface); cursor: pointer; line-height: 1.5; overflow-wrap: anywhere;
 }
@@ -207,8 +208,6 @@ input[type="range"]::-moz-range-thumb { width: calc(17 * var(--ui-unit)); height
 .audio-parameters dd { margin: 0; color: var(--text); font-variant-numeric: tabular-nums; }
 
 /* Resizable in-page and detached windows share the same responsive layout. */
-/* The parent dialog blurs YouTube; transparent iframe roots reveal that surface. */
-html[data-settings-embedded], html[data-settings-embedded] body { background: transparent; }
 html[data-settings-window] { font-size: clamp(14px, calc(7px + 1.25vw), 20px); }
 html[data-settings-window], html[data-settings-window] body { width: 100%; min-width: 0; height: 100%; overflow: hidden; }
 html[data-settings-window] .panel { display: flex; flex-direction: column; height: 100%; }

@@ -10,6 +10,8 @@
     "[id*='ambient' i], [class*='ambient' i], [" + AMBIENT_BLOCKED_ATTR + "]";
   const LIVE_CHAT_HOST_SELECTOR = "yt-live-chat-app, yt-live-chat-renderer";
   const PLAYER_SCOPE_SELECTOR = ".html5-video-player, #inline-player, #inline-preview-player";
+  const PLAYER_CONTROL_TOOLTIP = '.html5-video-player .ytp-tooltip:not(.ytp-preview)';
+  const PLAYER_TIME_CAPSULE = '.html5-video-player.ytp-delhi-modern .ytp-time-wrapper';
   const UNIVERSAL_GLASS_ATTR = "data-ytc-universal-glass";
   const UNIVERSAL_GLASS_CLEAR_ATTR = "data-ytc-universal-clear";
   const GLASS_BACKDROP = "var(--ytc-ui-backdrop)";
@@ -32,18 +34,18 @@
   // row owns their background and highlight. Painting the label makes a dark tile.
   const SEARCH_SUGGESTION_LABEL_SELECTOR = '.ytSuggestionComponentSuggestion .ytSuggestionComponentText [role="button"]';
   const BUTTON_EXCLUSIONS = PLAYER_SCOPE_SELECTOR + ', .html5-video-container, video, img, canvas, iframe, ' +
-    '.ytp-scrubber-button, .ytp-progress-bar, .ytp-cued-thumbnail-overlay, [data-ytc-bookmark-pin], ' +
+    '.ytp-scrubber-button, .ytp-progress-bar, .ytp-cued-thumbnail-overlay, [data-ytc-bookmark-pin], .ytc-volume-boost-toggle, ' +
     'ytd-thumbnail, yt-thumbnail-view-model, .ytThumbnailViewModelHost, ' +
     '.ytLockupViewModelContentImage, .yt-lockup-view-model__content-image, ' + COMMENT_AVATAR_SELECTOR + ', ' +
     SEARCH_SUGGESTION_LABEL_SELECTOR;
   const BUTTON_SURFACE_SELECTOR = `${BUTTON_MATCH_SELECTOR}:not(:has(${BUTTON_MATCH_SELECTOR})):not(:where(${BUTTON_EXCLUSIONS}))`;
   const BUTTON_WRAPPER_SELECTOR = `${BUTTON_MATCH_SELECTOR}:has(${BUTTON_MATCH_SELECTOR}):not(:where(${BUTTON_EXCLUSIONS}, ` +
     'yt-chip-cloud-chip-renderer, .html5-video-player.ytp-delhi-modern.ytp-delhi-horizontal-volume-controls .ytp-volume-area, ' +
-    '.html5-video-player.ytp-delhi-modern .ytp-volume-popover, ' +
+    '.html5-video-player.ytp-delhi-modern .ytp-volume-popover, ' + PLAYER_TIME_CAPSULE + ', ' +
     'ytmusic-carousel-shelf-renderer :is(#previous-items-button, #next-items-button)))';
   const BUTTON_INNER_SELECTOR = ':is(yt-chip-cloud-chip-renderer, ' +
     '.html5-video-player.ytp-delhi-modern.ytp-delhi-horizontal-volume-controls .ytp-volume-area, ' +
-    '.html5-video-player.ytp-delhi-modern .ytp-volume-popover) ' + BUTTON_SURFACE_SELECTOR;
+    '.html5-video-player.ytp-delhi-modern .ytp-volume-popover, ' + PLAYER_TIME_CAPSULE + ') ' + BUTTON_SURFACE_SELECTOR;
   const MASTHEAD_BACKDROP_SELECTOR = "ytd-masthead > #background";
   // Frost the header's background sibling so autocomplete can still sample the page.
   // An iframe also needs its outer frame to sample the parent document's wallpaper.
@@ -214,10 +216,12 @@
     "ytd-voice-search-dialog-renderer #voice-search-dialog",
     "ytd-tabbed-page-header", "ytd-c4-tabbed-header-renderer", "ytd-playlist-header-renderer",
     "yt-page-header-renderer", "yt-page-header-view-model",
-    ".ytp-popup", ".ytp-tooltip-text", "tp-yt-paper-tooltip #tooltip",
+    ".ytp-popup", "tp-yt-paper-tooltip #tooltip",
     // Modern volume controls paint one capsule; its hover pseudo layer stays clear.
     ".html5-video-player.ytp-delhi-modern.ytp-delhi-horizontal-volume-controls .ytp-volume-area",
     ".html5-video-player.ytp-delhi-modern .ytp-volume-popover",
+    // The time wrapper owns the capsule; elapsed/remaining and Live share its glass.
+    PLAYER_TIME_CAPSULE,
     "tp-yt-app-drawer #contentContainer", "ytd-engagement-panel-section-list-renderer > #content",
     SHORTS_PANEL_SELECTOR,
     "ytd-masthead #search", "ytd-masthead #center", "ytd-masthead #container", "yt-searchbox",
@@ -257,6 +261,8 @@
     SEARCH_SHORTS_FOOTER_SELECTOR,
     // Blur on the outer header moves its fixed descendants into a new containing block.
     CHANNEL_SCOPE_SELECTOR + ' :is(ytd-tabbed-page-header, ytd-c4-tabbed-header-renderer)',
+    // The app header paints this toolbar opaque only after the channel tabs stick.
+    CHANNEL_SCOPE_SELECTOR + ' ytd-tabbed-page-header tp-yt-app-toolbar',
     CHANNEL_PANEL_SELECTOR + ' :is(ytd-shelf-renderer, ytd-rich-shelf-renderer, grid-shelf-view-model)',
     CHANNEL_SCOPE_SELECTOR + ' ytd-post-renderer :is(#dismissible, #body, #header, #toolbar)',
     CHANNEL_SCOPE_SELECTOR + ' .ytGridShelfViewModelGridShelfBottomButtonContainer',
@@ -425,9 +431,16 @@
       @media (max-width: 600px) {
         ${scope} :is(.ytp-left-controls, .ytp-right-controls, .ytp-right-controls-left, .ytp-right-controls-right) { column-gap: 2px !important; }
       }
-      ${scope} ${BUTTON_SURFACE_SELECTOR}:hover:not(:disabled, [disabled], [aria-disabled="true"]) {
-        outline: 1px solid rgb(255 255 255 / 40%);
-        outline-offset: -2px;
+      /* Suppress pointer-hover rings, including native pseudo-element rims. */
+      ${scope} :is(${BUTTON_ELEMENTS}, yt-chip-cloud-chip-renderer):hover:not(:focus-visible),
+      ${scope} :is(${BUTTON_ELEMENTS}, yt-chip-cloud-chip-renderer):hover::before,
+      ${scope} :is(${BUTTON_ELEMENTS}, yt-chip-cloud-chip-renderer):hover::after {
+        outline: none !important;
+        box-shadow: none !important;
+      }
+      ${scope} :is(${BUTTON_ELEMENTS}, yt-chip-cloud-chip-renderer):hover::before,
+      ${scope} :is(${BUTTON_ELEMENTS}, yt-chip-cloud-chip-renderer):hover::after {
+        border-color: transparent !important;
       }
       ${scope} ${BUTTON_SURFACE_SELECTOR}:is(:disabled, [disabled], [aria-disabled="true"]) {
         opacity: .5;
@@ -1141,6 +1154,11 @@
       ${channel} tp-yt-paper-tabs {
         padding-inline: 12px !important;
       }
+      ${channel} ytd-tabbed-page-header #tabs-divider {
+        border-color: transparent !important;
+        background: transparent !important;
+        box-shadow: none !important;
+      }
       ${channel} ytd-section-list-renderer {
         padding-top: 16px !important;
       }
@@ -1626,6 +1644,70 @@
   }
   // Share the same targets with CSS so new UI surfaces are styled before the observer runs.
   runtime.buildSurfaceCss = () => `
+    /* Player hints have one readable panel; the label must never be a glass tile. */
+    html[data-ytc-theme] ${PLAYER_CONTROL_TOOLTIP} {
+      max-width: min(300px, calc(100% - 16px)) !important;
+      pointer-events: none !important;
+    }
+    html[data-ytc-theme] ${PLAYER_CONTROL_TOOLTIP} .ytp-tooltip-text-wrapper {
+      background: transparent !important;
+      box-shadow: none !important;
+      backdrop-filter: none !important;
+    }
+    html[data-ytc-theme] ${PLAYER_CONTROL_TOOLTIP} .ytp-tooltip-bottom-text,
+    html[data-ytc-theme] ${PLAYER_CONTROL_TOOLTIP} .ytp-tooltip-text:not(.ytp-tooltip-bottom-text *) {
+      display: inline-flex !important;
+      align-items: center !important;
+      box-sizing: border-box !important;
+      max-width: 100% !important;
+      gap: 8px !important;
+      padding: 6px 10px !important;
+      border: 0 !important;
+      border-radius: 8px !important;
+      outline: none !important;
+      background: rgb(24 24 24 / 94%) !important;
+      box-shadow: none !important;
+      backdrop-filter: ${GLASS_BACKDROP} !important;
+      color: #fff !important;
+      font: 500 13px/20px Roboto, Arial, sans-serif !important;
+      text-shadow: none !important;
+      text-decoration: none !important;
+      white-space: normal !important;
+      overflow-wrap: anywhere;
+    }
+    html[data-ytc-theme] ${PLAYER_CONTROL_TOOLTIP} .ytp-tooltip-bottom-text .ytp-tooltip-text {
+      min-width: 0;
+      padding: 0 !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      backdrop-filter: none !important;
+      color: inherit !important;
+      font: inherit !important;
+      text-shadow: none !important;
+      text-decoration: none !important;
+      white-space: normal !important;
+      overflow-wrap: anywhere;
+    }
+    html[data-ytc-theme] ${PLAYER_CONTROL_TOOLTIP} .ytp-tooltip-keyboard-shortcut:not(:empty) {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      flex: none;
+      box-sizing: border-box !important;
+      min-width: 20px;
+      height: 20px;
+      margin: 0 !important;
+      padding: 0 4px !important;
+      border: 1px solid rgb(255 255 255 / 30%) !important;
+      border-radius: 4px !important;
+      background: rgb(255 255 255 / 8%) !important;
+      backdrop-filter: none !important;
+      color: #fff !important;
+      font: 500 12px/18px Roboto, Arial, sans-serif !important;
+      text-shadow: none !important;
+      white-space: nowrap !important;
+    }
+    html[data-ytc-theme] ${PLAYER_CONTROL_TOOLTIP} .ytp-tooltip-keyboard-shortcut:empty { display: none !important; }
     /* Named view-transition surfaces prevent descendants from sampling the wallpaper in Chrome. */
     html[data-ytc-theme][data-ytc-blur] ytd-watch-flexy :is(#below, #secondary) {
       view-transition-name: none !important;

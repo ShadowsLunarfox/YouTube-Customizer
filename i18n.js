@@ -1,6 +1,8 @@
 // Translate extension-owned menus only. Page content and saved appearance stay untouched.
 (() => {
   const chinese = Object.freeze({
+    'Dislike estimates': '点踩数估算', 'Show estimated dislikes': '显示估算点踩数', 'Estimated dislikes': '估算点踩数',
+    'Estimates from Return YouTube Dislike. Enabling this sends the current video ID to its service.': '估算由 Return YouTube Dislike 提供。启用后会将当前视频 ID 发送至该服务。',
     'Make YouTube yours.': '让 YouTube 更合你意。',
     'Timeline record statistics': '播放条记录统计', 'Recorded videos': '已记录影片', 'Timeline points': '记录点总数', 'Sticky notes': '小纸条数量',
     'Local totals across all videos. Notes count records with non-empty text.': '统计本机所有影片的记录；有文字的记录点计为一张小纸条。',
@@ -152,6 +154,8 @@
 
   // Complete, local message catalogs. No network translation or page-content rewriting.
   const traditional = Object.freeze({
+    'Dislike estimates': '倒讚數估算', 'Show estimated dislikes': '顯示估算倒讚數', 'Estimated dislikes': '估算倒讚數',
+    'Estimates from Return YouTube Dislike. Enabling this sends the current video ID to its service.': '估算由 Return YouTube Dislike 提供。啟用後會將目前影片 ID 傳送至該服務。',
     "Make YouTube yours.": "讓 YouTube 更合你意。",
     "Timeline record statistics": "播放條記錄統計",
     "Recorded videos": "已記錄影片",
@@ -496,6 +500,8 @@
   } }),
     'zh-TW': traditional,
     'yue-Hant': Object.freeze({ ...traditional, ...{
+    'Dislike estimates': '負評數估算', 'Show estimated dislikes': '顯示估算負評數', 'Estimated dislikes': '估算負評數',
+    'Estimates from Return YouTube Dislike. Enabling this sends the current video ID to its service.': '估算由 Return YouTube Dislike 提供。開咗之後會將而家條片嘅 ID 傳送畀呢個服務。',
     "Make YouTube yours.": "整個啱你心水嘅 YouTube。",
     "Timeline record statistics": "播放條記錄統計",
     "Recorded videos": "已記錄影片",
@@ -635,6 +641,8 @@
     "Invalid backup media: {value}": "備份媒體無效：{value}"
   } }),
     'ja': Object.freeze({
+    'Dislike estimates': '低評価数の推定', 'Show estimated dislikes': '推定低評価数を表示', 'Estimated dislikes': '推定低評価数',
+    'Estimates from Return YouTube Dislike. Enabling this sends the current video ID to its service.': '推定値は Return YouTube Dislike が提供します。有効にすると、現在の動画 ID が同サービスに送信されます。',
     "Make YouTube yours.": "YouTubeを自分らしく。",
     "Timeline record statistics": "タイムライン記録の統計",
     "Recorded videos": "記録した動画",
@@ -961,6 +969,8 @@
     "Invalid backup media: {value}": "無効なバックアップメディア：{value}"
   }),
     'ms-MY': Object.freeze({
+    'Dislike estimates': 'Anggaran tidak suka', 'Show estimated dislikes': 'Tunjukkan anggaran tidak suka', 'Estimated dislikes': 'Anggaran tidak suka',
+    'Estimates from Return YouTube Dislike. Enabling this sends the current video ID to its service.': 'Anggaran daripada Return YouTube Dislike. Mengaktifkannya akan menghantar ID video semasa kepada perkhidmatan itu.',
     "Make YouTube yours.": "Jadikan YouTube milik anda.",
     "Timeline record statistics": "Statistik rekod garis masa",
     "Recorded videos": "Video yang direkodkan",
@@ -1287,6 +1297,8 @@
     "Invalid backup media: {value}": "Media sandaran tidak sah: {value}"
   }),
     'id': Object.freeze({
+    'Dislike estimates': 'Perkiraan tidak suka', 'Show estimated dislikes': 'Tampilkan perkiraan tidak suka', 'Estimated dislikes': 'Perkiraan tidak suka',
+    'Estimates from Return YouTube Dislike. Enabling this sends the current video ID to its service.': 'Perkiraan dari Return YouTube Dislike. Mengaktifkannya akan mengirim ID video saat ini ke layanan tersebut.',
     "Make YouTube yours.": "Jadikan YouTube sesuai gayamu.",
     "Timeline record statistics": "Statistik catatan linimasa",
     "Recorded videos": "Video yang dicatat",
@@ -1613,6 +1625,8 @@
     "Invalid backup media: {value}": "Media cadangan tidak valid: {value}"
   }),
     'th': Object.freeze({
+    'Dislike estimates': 'ค่าประมาณการไม่ชอบ', 'Show estimated dislikes': 'แสดงค่าประมาณการไม่ชอบ', 'Estimated dislikes': 'ค่าประมาณการไม่ชอบ',
+    'Estimates from Return YouTube Dislike. Enabling this sends the current video ID to its service.': 'ค่าประมาณจาก Return YouTube Dislike เมื่อเปิดใช้งาน ระบบจะส่งรหัสวิดีโอปัจจุบันไปยังบริการนี้',
     "Make YouTube yours.": "ปรับ YouTube ให้เป็นสไตล์คุณ",
     "Timeline record statistics": "สถิติบันทึกบนไทม์ไลน์",
     "Recorded videos": "วิดีโอที่บันทึกไว้",
@@ -1939,6 +1953,8 @@
     "Invalid backup media: {value}": "สื่อสำรองไม่ถูกต้อง: {value}"
   }),
     'ko': Object.freeze({
+    'Dislike estimates': '싫어요 수 추정', 'Show estimated dislikes': '추정 싫어요 수 표시', 'Estimated dislikes': '추정 싫어요 수',
+    'Estimates from Return YouTube Dislike. Enabling this sends the current video ID to its service.': 'Return YouTube Dislike에서 제공하는 추정치입니다. 활성화하면 현재 동영상 ID가 해당 서비스로 전송됩니다.',
     "Make YouTube yours.": "나만의 YouTube를 만드세요.",
     "Timeline record statistics": "타임라인 기록 통계",
     "Recorded videos": "기록한 동영상",

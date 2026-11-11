@@ -61,6 +61,9 @@
   let styleEl = appearance?.styleEl || null;
   let disposed = false;
   let stylesApplied = false;
+  let staticPageCss, staticButtonCss;
+  const tokenSettingKeys = new Set(["uiOpacity", "uiBlur", "barHeight", "thumbSize",
+    "showVideoBookmarks", "useDefaultShortcuts", "showDislikeEstimates", ...audioKeys]);
   let sidebarTimer = 0;
   let backgroundVideo = appearance?.backgroundVideo || null;
   let backgroundVideoData = appearance?.backgroundVideoData || "";
@@ -218,7 +221,6 @@
     // its Base64 again whenever any setting rebuilds the page stylesheet.
     const thumbUri = settings.thumbStyle === 'custom' && customIconUrl
       ? customIconUrl : iconDataUri(settings.thumbStyle, settings.thumbColor);
-    const halfThumb = settings.thumbSize / 2;
     const progressTargets = "html body .ytp-play-progress, html body .ytp-hover-progress";
     const animation = settings.reduceAnimations ? "none" : "ytc-progress-pulse 1.1s ease-in-out infinite alternate";
     let effectCss = "";
@@ -327,21 +329,21 @@
       }
 
       html body .ytp-progress-list {
-        height: ${settings.barHeight}px !important;
-        transform: translateY(-${Math.max(0, Math.round((settings.barHeight - 4) / 2))}px);
+        height: var(--ytc-player-bar-height) !important;
+        transform: translateY(var(--ytc-player-bar-offset));
         border-radius: 999px !important;
         overflow: visible !important;
       }
 
       html body .ytp-play-progress,
       html body .ytp-load-progress,
-      html body .ytp-hover-progress { height: ${settings.barHeight}px !important; border-radius: 999px !important; }
+      html body .ytp-hover-progress { height: var(--ytc-player-bar-height) !important; border-radius: 999px !important; }
 
       html body .html5-video-player .ytp-scrubber-button {
-        width: ${settings.thumbSize}px !important;
-        height: ${settings.thumbSize}px !important;
-        margin-left: -${halfThumb}px !important;
-        margin-top: -${Math.max(0, halfThumb - settings.barHeight / 2)}px !important;
+        width: var(--ytc-player-thumb-size) !important;
+        height: var(--ytc-player-thumb-size) !important;
+        margin-left: calc(var(--ytc-player-thumb-size) / -2) !important;
+        margin-top: min(0px, calc((var(--ytc-player-bar-height) - var(--ytc-player-thumb-size)) / 2)) !important;
         border-radius: 0 !important;
         background: transparent url("${thumbUri}") center / contain no-repeat !important;
         box-shadow: none !important;
@@ -1057,6 +1059,8 @@
   if (settingsController) globalThis.YTCustomizerInPageSettings?.upgradeEntryIcons?.();
   const videoBookmarks = globalThis.YTCustomizerVideoBookmarks?.createController();
   const defaultShortcuts = globalThis.YTCustomizerDefaultShortcuts?.createController();
+  const dislikeCounts = globalThis.YTCustomizerDislikes?.createController();
+  const publicationDates = globalThis.YTCustomizerPublicationDates?.createController();
 
   function applyConfiguration(settings = sharedSettings, assets = sharedAssets, profiles = pageProfiles, media = pageAssets) {
     sharedSettings = normalize(settings);
@@ -1081,14 +1085,27 @@
     const numericOnly = stylesApplied && assetsUnchanged && Object.keys(DEFAULT_SETTINGS)
       .every(key => typeof DEFAULT_SETTINGS[key] === 'number' || nextSettings[key] === currentSettings[key]);
     const columnsChanged = nextSettings.videosPerRow !== currentSettings.videosPerRow;
-    const surfaceTokensOnly = stylesApplied && styleEl?.isConnected && assetsUnchanged &&
-      Object.keys(DEFAULT_SETTINGS).every(key => ["uiOpacity", "uiBlur", "showVideoBookmarks", "useDefaultShortcuts", ...audioKeys].includes(key) || nextSettings[key] === currentSettings[key]);
+    const tokensOnly = stylesApplied && styleEl?.isConnected && assetsUnchanged &&
+      Object.keys(DEFAULT_SETTINGS).every(key => tokenSettingKeys.has(key) || nextSettings[key] === currentSettings[key]);
     currentSettings = nextSettings;
     audio.sync(currentSettings);
     volumeBoostControls?.sync(currentSettings);
     videoBookmarks?.sync(currentSettings);
     defaultShortcuts?.sync(currentSettings);
+    dislikeCounts?.sync(currentSettings);
     if (!assetsUnchanged) currentAssets = normalizeAssets(assets);
+    // Player geometry works independently of the page theme. Dragging its size
+    // sliders must not reparse the full page skin or restart progress effects.
+    const playerTokens = {
+      "--ytc-player-bar-height": currentSettings.barHeight + "px",
+      "--ytc-player-bar-offset": -Math.max(0, Math.round((currentSettings.barHeight - 4) / 2)) + "px",
+      "--ytc-player-thumb-size": currentSettings.thumbSize + "px"
+    };
+    for (const [property, value] of Object.entries(playerTokens)) {
+      if (document.documentElement.style.getPropertyValue(property) !== value) {
+        document.documentElement.style.setProperty(property, value, "important");
+      }
+    }
     // Sliders update inherited tokens without surface scans or replacing the main stylesheet.
     const surfaceTokens = {
       "--ytc-ui-opacity": String(currentSettings.uiOpacity / 100),
@@ -1105,7 +1122,7 @@
       }
     }
     document.documentElement.toggleAttribute("data-ytc-blur", currentSettings.themeEnabled && currentSettings.uiBlur > 0);
-    if (surfaceTokensOnly) return;
+    if (tokensOnly) return;
     document.documentElement.toggleAttribute("data-ytc-theme", currentSettings.themeEnabled);
     document.documentElement.toggleAttribute("data-ytc-cards", currentSettings.customizeCards);
     document.documentElement.toggleAttribute("data-ytc-chat-frame",
@@ -1121,12 +1138,14 @@
     syncCustomIcon();
     syncBackgroundImage();
     syncBackgroundVideo();
+    // Surface selectors and button rules do not depend on settings or media.
+    // Keep one copy per runtime instead of rebuilding them on every color edit.
     const css = buildPlayerCss(currentSettings) +
       buildAppearanceCss(currentSettings, currentAssets) +
       (isMusic ? runtime.buildMusicCss(currentSettings) :
-        (runtime.buildHomepageGlassCss?.() || "") + (runtime.buildSurfaceCss?.() || "") + buildLayoutCss(currentSettings) +
+        (staticPageCss ??= (runtime.buildHomepageGlassCss?.() || "") + (runtime.buildSurfaceCss?.() || "")) + buildLayoutCss(currentSettings) +
         buildEffectsCss(currentSettings) + buildGridCss(currentSettings) + runtime.buildHomeShortsGridCss(currentSettings)) + buildCardLayoutCss(currentSettings) +
-      (runtime.buildButtonCss?.() || '');
+      (staticButtonCss ??= runtime.buildButtonCss?.() || '');
     if (styleEl.textContent !== css) styleEl.textContent = css;
     document.documentElement.toggleAttribute("data-ytc-reduced-effects", currentSettings.reduceAnimations);
     document.documentElement.toggleAttribute("data-ytc-disable-video-previews", currentSettings.disableVideoPreviews);
@@ -1245,6 +1264,8 @@
     volumeBoostControls?.handleMutations(records);
     inPageSettings?.handleMutations(records);
     videoBookmarks?.handleMutations(records);
+    dislikeCounts?.handleMutations(records);
+    publicationDates?.handleMutations(records);
     audio.handleMutations(records);
     if (isMusic) return;
     if (records.some(record => {
@@ -1267,7 +1288,7 @@
     childList: true, subtree: true,
     ...(!isMusic && { attributes: true,
       attributeFilter: ["style", "class", "hidden", "aria-hidden", "role", "has-paygated-featured-badge", "is-shorts",
-        "is-playables", "is-mini-game-card-shelf", "is-game-card-shelf"] })
+        "is-playables", "is-mini-game-card-shelf", "is-game-card-shelf", "is-active", "video-id"] })
   });
 
   const shortsEvents = ["yt-navigate-finish", "yt-page-data-updated", "fullscreenchange", "visibilitychange", "play", "loadeddata"];
@@ -1314,6 +1335,8 @@
       inPageSettings?.dispose();
       videoBookmarks?.dispose();
       defaultShortcuts?.dispose();
+      dislikeCounts?.dispose();
+      publicationDates?.dispose();
       surfaces?.dispose();
       if (!isMusic) {
         shortsEvents.forEach(event => document.removeEventListener(event, shorts.sync, true));
@@ -1347,6 +1370,9 @@
       document.documentElement.style.removeProperty("--ytc-ui-opacity");
       document.documentElement.style.removeProperty("--ytc-ui-blur");
       document.documentElement.style.removeProperty("--ytc-ui-backdrop");
+      document.documentElement.style.removeProperty("--ytc-player-bar-height");
+      document.documentElement.style.removeProperty("--ytc-player-bar-offset");
+      document.documentElement.style.removeProperty("--ytc-player-thumb-size");
       styleEl?.remove();
       styleEl = null;
     }

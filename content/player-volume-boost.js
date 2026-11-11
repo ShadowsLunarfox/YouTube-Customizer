@@ -79,8 +79,11 @@
     (document.head || document.documentElement).append(style);
 
     function updateState() {
+      const state = language + ':' + enabled + ':' + boost;
+      const label = t('Audio enhancement') + ' · ' + t(enabled ? 'On' : 'Off');
       for (const entry of entries.values()) {
-        const label = t('Audio enhancement') + ' · ' + t(enabled ? 'On' : 'Off');
+        if (entry.renderedState === state) continue;
+        entry.renderedState = state;
         entry.host.toggleAttribute('data-enabled', enabled);
         entry.host.style.setProperty('--ytc-boost-color', enabled ? '#ffce70' : '#c5cbd3');
         entry.host.style.setProperty('--ytc-boost-fill', (boost - 100) / 4 + '%');
@@ -120,7 +123,7 @@
       });
     }
 
-    function syncHeight(entry, height = entry.anchor?.offsetHeight) {
+    function syncHeight(entry, height) {
       if (height > 0 && entry.height !== height) {
         entry.height = height;
         entry.host.style.setProperty('--ytc-volume-boost-height', height + 'px');
@@ -205,9 +208,9 @@
           if (entry.anchor) { resize.unobserve(entry.anchor); anchors.delete(entry.anchor); }
           entry.anchor = anchor;
           anchors.set(anchor, entry);
+          // Observe the native size instead of forcing layout on each remount.
           resize.observe(anchor, { box: 'border-box' });
         }
-        syncHeight(entry);
         if (anchor.nextElementSibling !== entry.host) anchor.after(entry.host);
         if (!entry.status.isConnected) player.append(entry.status);
       });

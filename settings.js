@@ -9,6 +9,7 @@
     thumbStyle: "circle",
     barHeight: 5,
     thumbSize: 16,
+    showDislikeEstimates: false,
     showVideoBookmarks: true,
     useDefaultShortcuts: true,
     audioEnabled: false,
@@ -76,7 +77,7 @@
   const audioKeys = Object.freeze(["audioEnabled", "volumeBoost", "bassGain", "midGain", "trebleGain", "audioBalance", "audioLimiter"]);
   const tabKeys = Object.freeze({
     appearance: ["themeEnabled", "pageColor", "surfaceColor", "uiOpacity", "uiBlur", "textColor", "accentColor", "backgroundMode", "backgroundFit", "backgroundOpacity"],
-    player: ["progressColor", "progressEffect", "bufferColor", "heatmapColor", "thumbColor", "thumbStyle", "barHeight", "thumbSize"],
+    player: ["progressColor", "progressEffect", "bufferColor", "heatmapColor", "thumbColor", "thumbStyle", "barHeight", "thumbSize", "showDislikeEstimates"],
     records: ["showVideoBookmarks"],
     shortcuts: ["useDefaultShortcuts"],
     audio: audioKeys,
@@ -305,7 +306,7 @@
   }
 
   globalThis.YTCustomizer = Object.freeze({
-    version: "163", defaults, assetDefaults, presets, tabKeys, audioKeys, normalize, normalizeAssets,
+    version: "167", defaults, assetDefaults, presets, tabKeys, audioKeys, normalize, normalizeAssets,
     pageScopes, profileKeys, cardKeys, normalizeProfiles, normalizePageAssets, pageScope, resolveSettings, resolveAssets, createBackup, parseBackup,
     isImageData, isBackgroundData, isYouTubeUrl, isSettingsPageUrl, iconDataUri,
     hasExtensionContext, sendRuntimeMessage, removeExtensionListener, isNativeFullscreenKey

@@ -16,6 +16,10 @@
 
 Long sessions release retired feed surfaces and removed player audio graphs. Small player icon/clock replacements clean up only their removed subtrees instead of rechecking every retained comment and recommendation, including in background tabs. Background tabs discard obsolete visual update queues and reconcile the current page on return; video wallpapers pause while hidden and reuse their existing media and Blob URL on resume.
 
+Player bar-height and scrubber-size previews update inherited CSS variables without replacing the page stylesheet. Settings-independent surface and button CSS is reused across edits. The volume boost control skips unchanged UI writes and follows native height changes through ResizeObserver instead of polling layout during control updates.
+
+Search results batch publication-date discovery by outer inserted subtree. Date observers track date text and video identity; native preview clocks, view counters and headings do not rescan or repaint the date. Search and Home avoid watch-page metadata scans. Both typed searches and completed voice-search submissions use this path.
+
 Closing a native dialog, including Report, releases its glass styling and all nested surface overrides. Cached hidden forms are left idle until reopened, so native cancellation updates do not trigger repeated background and blur rewrites.
 
 The in-page menu displays its shell before loading the authenticated form. Local wallpaper and icon previews decode in small chunks and use revocable Blob URLs; preview videos pause outside Appearance. Closing unchanged settings performs no storage writes, while pending edits finish saving before the frame is removed.
@@ -51,6 +55,8 @@ Old page callbacks handle an extension reload without uncaught context errors. A
 - A Picture-in-picture icon also appears at the left edge of the player's right-hand controls, before CC/settings, so you can open or close the floating video without opening the extension menu. It follows the native controls in theater/fullscreen mode and returns when YouTube rebuilds its player controls.
 - Fullscreen entry and exit use YouTube's native behavior. The extension does not change the browser window's size or state. F and Escape also reach the player from the extension entry and timeline-marker buttons; typing in notes and search fields stays unchanged.
 - Customize progress and buffered-segment colors, progress-bar thickness, and scrubber size.
+- Video publication labels use **YYYY-MM-DD (N years ago)** on watch pages, Home/search/channel/recommendation cards, and description date widgets, including Shorts. Years count completed calendar anniversaries. Dates come from YouTube's `datePublished` metadata, preserving its calendar day rather than estimating a day from a relative age. Visible cards look up missing dates through a bounded, shared six-hour session cache with limited concurrency; downloads stop after finding the date. Native views, links and comment timestamps keep their behavior. If exact metadata is unavailable, the native label remains; upcoming dates are left unchanged.
+- **Player → Show estimated dislikes** adds an `≈` count to native dislike controls on watch pages and Shorts. Estimates come from [Return YouTube Dislike](https://returnyoutubedislike.com/), rather than YouTube's private totals. This option starts off; enabling it sends the current video ID to that service. Lookups share a bounded 30-minute session cache, coalesce across tabs, and back off when rate-limited. Missing data leaves the native button intact. The integration only reads estimates; native voting remains with YouTube.
 - Choose a separate color for the **Most replayed** heatmap, including its gradient and outline.
 - Choose a solid color, pulsing glow, moving shimmer, or cycling rainbow effect.
 - Pick a built-in scrubber shape or upload a custom image or GIF.

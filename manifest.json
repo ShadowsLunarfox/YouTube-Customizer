@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "YouTube Customizer",
   "description": "Personalize YouTube backgrounds, colors, progress icons, and page layout.",
-  "version": "2.14.19",
+  "version": "2.14.23",
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",
@@ -22,9 +22,9 @@
       "description": "Toggle audio enhancement / 切换声音增强"
     }
   },
-  "host_permissions": ["https://*.youtube.com/*"],
+  "host_permissions": ["https://*.youtube.com/*", "https://returnyoutubedislikeapi.com/*"],
   "content_security_policy": {
-    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self' https://youtube.com https://*.youtube.com;"
+    "extension_pages": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src https://returnyoutubedislikeapi.com https://www.youtube.com; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self' https://youtube.com https://*.youtube.com;"
   },
   "action": {
     "default_title": "YouTube Customizer",
@@ -55,6 +55,8 @@
         "content/in-page-settings.js",
         "content/video-bookmarks.js",
         "content/default-shortcuts.js",
+        "content/dislike-counts.js",
+        "content/publication-dates.js",
         "yt.js"
       ],
       "all_frames": true,

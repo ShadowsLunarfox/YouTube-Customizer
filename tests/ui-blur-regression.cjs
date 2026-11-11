@@ -68,7 +68,9 @@ const fixture = `<!doctype html><html><head><style>
     </yt-sheet-view-model>
   </tp-yt-paper-dialog>
   <button id="control" class="ytSpecButtonShapeNextHost" data-blurred aria-pressed="false">Save</button>
-  <div class="html5-video-player"><video id="fixture-video"></video><div class="ytp-tooltip-text" id="tooltip" data-blurred>Seek</div></div>
+  <div class="html5-video-player"><video id="fixture-video"></video><div class="ytp-tooltip">
+    <div class="ytp-tooltip-text-wrapper"><div class="ytp-tooltip-bottom-text"><span class="ytp-tooltip-text" id="tooltip">Seek</span></div></div>
+  </div></div>
   <ytd-live-chat-frame data-frosted-wrapper><div id="chat" data-clear><iframe data-clear src="/live_chat?v=blur-fixture"></iframe></div></ytd-live-chat-frame>
 </ytd-app><script>
   document.getElementById("control").addEventListener("click", event => event.currentTarget.setAttribute("aria-pressed", "true"));
@@ -169,6 +171,14 @@ const chatFixture = `<!doctype html><html><head><style>
       "watch backdrop boundaries are released only while blur is on");
       assert.equal(await chat.evaluate(() => getComputedStyle(document.querySelector("yt-live-chat-renderer").shadowRoot.querySelector("#contents")).backdropFilter), "none", "chat shadow wrappers do not add a second blur");
       assert.equal(await page.locator("#frosted-glass").evaluate(element => getComputedStyle(element, "::before").backdropFilter), "none", "native dark overlay blur stays cleared");
+      assert.deepEqual(await page.locator("#tooltip").evaluate(element => ({
+        glass: element.hasAttribute("data-ytc-universal-glass"),
+        label: getComputedStyle(element).backgroundColor,
+        labelBlur: getComputedStyle(element).backdropFilter,
+        panel: getComputedStyle(element.parentElement).backgroundColor,
+        blur: getComputedStyle(element.parentElement).backdropFilter
+      })), { glass: false, label: "rgba(0, 0, 0, 0)", labelBlur: "none", panel: "rgba(24, 24, 24, 0.94)", blur: value ? "blur(" + value + "px)" : "none" },
+      "player tooltip keeps one readable panel and sharp labels as the glass sliders change");
     }
 
     await edit("uiBlur", 12);

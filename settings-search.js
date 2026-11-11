@@ -22,6 +22,7 @@
       audioMonitor:'meter level levels peak rms dbfs 音量条 音量显示 显示音量 电平 实时音量 峰值',
       exportSettings:'backup export save json 备份 导出 保存', importSettings:'backup import restore json 备份 导入 恢复'
     };
+    aliases.showDislikeEstimates = 'dislike dislikes downvote return youtube dislike ryd 不喜欢 不喜歡 踩 点踩 倒讚';
     const normalize = text => text.normalize('NFKC').toLowerCase().replace(/[-_/]+/g,' ').replace(/\s+/g,' ').trim();
     const entries = [], seen = new Set();
     const translations = text => YTCustomizerI18n.languages.map(language => YTCustomizerI18n.translate(text, language.code));

@@ -1,5 +1,25 @@
 // Browser-managed shortcuts preserve user remapping and avoid YouTube's single-key controls.
-importScripts('settings.js', 'i18n.js', 'content/picture-in-picture.js', 'content/video-bookmarks.js');
+importScripts('settings.js', 'i18n.js', 'content/picture-in-picture.js', 'content/video-bookmarks.js', 'content/dislike-counts.js', 'content/publication-dates.js');
+
+const publicationDates = YTCustomizerPublicationDates.createService();
+chrome.runtime.onMessage.addListener((message,sender,reply) => {
+  if(message?.type!=='YT_PUBLICATION_DATE'||sender?.id!==chrome.runtime.id||sender.frameId!==0||!sender.tab?.id||
+    !YTCustomizer.isYouTubeUrl(sender.url)||!['www.youtube.com','youtube.com'].includes(new URL(sender.url).hostname))return false;
+  void publicationDates.get(message.videoId).then(date=>reply({date}),()=>reply({date:''}));return true;
+});
+
+const dislikeEstimates = YTCustomizerDislikes.createService();
+chrome.runtime.onMessage.addListener((message, sender, reply) => {
+  if (message?.type !== 'YT_DISLIKE_ESTIMATE' || sender?.id !== chrome.runtime.id || sender.frameId !== 0 ||
+      !sender.tab?.id || !YTCustomizer.isYouTubeUrl(sender.url) ||
+      YTCustomizerDislikes.videoId(sender.tab.url) !== message.videoId || !message.videoId) return false;
+  // Chrome can keep sender.url at the initial document URL after pushState.
+  // The tab's current URL binds this read-only request to the displayed video.
+  void chrome.storage.sync.get('showDislikeEstimates').then(values =>
+    values.showDislikeEstimates === true ? dislikeEstimates.get(message.videoId) : {ok:false}
+  ).then(reply, () => reply({ok:false}));
+  return true;
+});
 
 const shortcutQueues = new Map();
 

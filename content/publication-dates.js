@@ -112,6 +112,7 @@
   const cards = 'ytd-rich-item-renderer,ytd-rich-grid-media,ytd-video-renderer,ytd-compact-video-renderer,ytd-grid-video-renderer,ytd-playlist-video-renderer,yt-lockup-view-model';
   const cardTags=new Set(cards.split(','));
   const watchRoots = 'ytd-watch-metadata,ytd-video-primary-info-renderer,ytd-video-description-header-renderer';
+  const players = '.html5-video-player,#inline-player,#inline-preview-player';
   const cardDates = '#metadata-line .inline-metadata-item,#metadata-line > span,#video-info > span,.ytContentMetadataViewModelMetadataText,.yt-content-metadata-view-model-wiz__metadata-text,time[datetime]';
   const factoid = 'upload-time-factoid-renderer .ytwFactoidRendererFactoid';
   const watchDates = '#info,#info > span,#info-strings,#info-strings > *,#date,#date > *,#date-text,#date-text span,#date-text yt-formatted-string,time[datetime],' + factoid;
@@ -144,6 +145,11 @@
       target.removeAttribute(owned); records.delete(target);
     }
     function clear(state) {for(const target of state.targets)restore(target);state.targets.clear();}
+    function syncLabel(target,record) {
+      if(record.appliedLabel!==undefined)for(const name of ['title','aria-label'])if(target.getAttribute(name)!==record.appliedLabel)record.attributes[name]=target.getAttribute(name);
+      record.appliedLabel=record.added ? record.applied : target.textContent;
+      for(const name of ['title','aria-label'])if(target.getAttribute(name)!==record.appliedLabel)target.setAttribute(name,record.appliedLabel);
+    }
     function paint(target,date,state) {
       const formatted=formatDate(date,locale()); if(!formatted)return;
       let record=records.get(target);
@@ -161,11 +167,9 @@
         }
       }
       const text=record.original.slice(0,record.match.index)+formatted+record.original.slice(record.match.index+record.match[0].length);
-      if(record.appliedLabel!==undefined)for(const name of ['title','aria-label'])if(target.getAttribute(name)!==record.appliedLabel)record.attributes[name]=target.getAttribute(name);
       record.applied=text;ownText.set(record.node,text);
       if(record.node.data!==text)record.node.data=text;
-      record.appliedLabel=record.added ? text : target.textContent;
-      for(const name of ['title','aria-label'])if(target.getAttribute(name)!==record.appliedLabel)target.setAttribute(name,record.appliedLabel);
+      syncLabel(target,record);
       if(target.getAttribute(owned)!==date)target.setAttribute(owned,date);
       state.targets.add(target);
     }
@@ -192,12 +196,32 @@
       const current=new Set(list);for(const target of state.targets)if(!current.has(target)){restore(target);state.targets.delete(target);}
       if(date)for(const target of list)paint(target,date,state);
     }
-    function relevant(recordsList) {
-      return recordsList.some(record=>{
-        if(record.type==='characterData')return ownText.get(record.target)!==record.target.data;
-        if(record.type==='attributes'&&records.has(record.target)&&record.target.getAttribute(record.attributeName)===records.get(record.target).appliedLabel)return false;
-        return true;
-      });
+    function relevantWatch(changes) {
+      const dateText = node => Boolean(dateSegment(node.textContent) || yearOnly.test(node.textContent));
+      for (const change of changes) {
+        if (change.type === 'characterData') {
+          if (ownText.get(change.target) === change.target.data) continue;
+          // A combined #info label also contains rolling view counts. Only
+          // its date text belongs to us; sibling counters and titles stay native.
+          if ([...watchState.targets].some(target => records.get(target)?.node === change.target) ||
+              change.target.parentElement?.closest(watchDates) && dateText(change.target)) return true;
+          continue;
+        }
+        if (change.type === 'attributes') return true; // Native time[datetime].
+        for (const node of change.removedNodes) {
+          if ([...watchState.targets].some(target => node === target || node.contains(target) ||
+              node.contains(records.get(target)?.node))) return true;
+        }
+        const context = change.target instanceof Element && change.target.closest(watchDates);
+        for (const node of [...change.addedNodes, ...change.removedNodes]) {
+          if (node instanceof Element && node.hasAttribute('data-ytc-publication-owned')) continue;
+          if (context && dateText(node)) return true;
+          if (!(node instanceof Element)) continue;
+          if (node.matches(factoid) || node.matches(watchDates) && dateText(node)) return true;
+          if ([...node.querySelectorAll(watchDates)].some(target => target.matches(factoid) || dateText(target))) return true;
+        }
+      }
+      return false;
     }
     function relevantCard(entry,changes){
       for(const record of changes){
@@ -277,7 +301,15 @@
           .finally(()=>{inFlight--;pump();});
       }
     }
-    const watchObserver=new MutationObserver(changes=>{if(relevant(changes)){watchDirty=true;schedule();}});
+    const watchObserver=new MutationObserver(changes=>{
+      if(relevantWatch(changes)){watchDirty=true;schedule();return;}
+      // Keep combined labels accessible when just their native view count
+      // changes, without rediscovering or repainting the publication date.
+      for(const target of watchState.targets){const record=records.get(target);
+        if(record&&target.contains(record.node)&&record.node.data===record.applied&&
+            changes.some(change=>target.contains(change.target)))syncLabel(target,record);
+      }
+    });
     const sourceObserver=new MutationObserver(changes=>{
       if(changes.some(record=>record.target instanceof Element&&(record.target.matches(sources)||[...record.addedNodes].some(node=>node instanceof Element&&(node.matches(sources)||node.querySelector(sources)))))){watchDirty=true;schedule();}
     });
@@ -340,6 +372,10 @@
           // Card observers already handle metadata hydration/replacement. Do
           // not queue another frame for each thumbnail or preview update.
           if(registeredCard(target))continue;
+          // Player animations cannot introduce video cards or publication
+          // sources. Existing watch labels are handled by watchObserver, which
+          // can distinguish a date replacement from a native counter update.
+          if(target?.closest(players) || [...watchState.targets].some(date => date === target || date.contains(target)))continue;
           for(const node of record.removedNodes){if(!(node instanceof Element)||node.isConnected)continue;
             if(node.childElementCount||entries.has(node)||watchedRoots.has(node))removedRoots.add(node);
           }

@@ -182,6 +182,57 @@ async function shortsGeometry(page) {
     await page.evaluate(()=>document.querySelector('ytd-app').prepend(window.cachedHome));
     await page.waitForFunction(()=>document.querySelector('#modern .native-rows').getAttribute('data-ytc-home-shorts-grid')==='1');
     await checkLayout(page,6);
+    // YouTube can commit the new URL and start building the destination while
+    // Home is still painted. Its layout must survive both video click paths.
+    await page.evaluate(() => {
+      const video = document.createElement('a');
+      video.id = 'watch-link';
+      video.href = '/watch?v=aaaaaaaaaaa';
+      video.textContent = 'Watch video';
+      document.querySelector('[data-regular-card]').append(video);
+      document.querySelector('#home').addEventListener('click', event => {
+        const link = event.target.closest('#watch-link, a[href^="/shorts/"]');
+        if (!link) return;
+        event.preventDefault();
+        document.dispatchEvent(new Event('yt-navigate-start'));
+        history.pushState({}, '', link.href);
+        const destination = document.createElement(link.pathname === '/watch' ? 'ytd-watch-flexy' : 'ytd-shorts');
+        destination.id = 'destination';
+        destination.hidden = true;
+        document.querySelector('ytd-app').append(destination);
+        document.dispatchEvent(new Event('yt-page-data-updated'));
+      });
+    });
+    const routes = [
+      { link: '#watch-link', pathname: '/watch', hideHome: 'hidden' },
+      { link: '#modern a[href="/shorts/fixture-0"]', pathname: '/shorts/fixture-0', hideHome: 'style' }
+    ];
+    for (const { link, pathname, hideHome } of routes) {
+      const before = await shortsGeometry(page);
+      await page.locator(link).first().click();
+      assert.equal(new URL(page.url()).pathname, pathname);
+      assert.equal(await page.locator('#home').isVisible(), true, 'YouTube still shows Home after changing the URL');
+      assert.deepEqual(await shortsGeometry(page), before, 'visible Home shelf geometry holds after opening ' + pathname);
+      await page.evaluate(() => document.dispatchEvent(new Event('yt-navigate-finish')));
+      assert.deepEqual(await shortsGeometry(page), before, 'a navigation signal alone does not retire visible Home styling');
+      await page.evaluate(hideHome => {
+        const home = document.querySelector('#home');
+        if (hideHome === 'hidden') home.hidden = true;
+        else home.style.display = 'none';
+        document.querySelector('#destination').hidden = false;
+      }, hideHome);
+      await page.waitForFunction(() => !document.querySelector('#home [data-ytc-home-shorts-grid="1"]'));
+      await page.goBack();
+      await page.evaluate(() => {
+        const home = document.querySelector('#home');
+        home.hidden = false;
+        home.style.removeProperty('display');
+        document.querySelector('#destination').remove();
+        document.dispatchEvent(new Event('yt-navigate-finish'));
+      });
+      await page.waitForFunction(() => document.querySelector('#modern .native-rows').getAttribute('data-ytc-home-shorts-grid') === '1');
+      assert.deepEqual(await shortsGeometry(page), before, 'back navigation restores the cached Home layout');
+    }
     const nativePage=await context.newPage();await nativePage.goto('https://native-layout.test/');
     await popup.evaluate(async()=>{const[tab]=await chrome.tabs.query({url:'https://www.youtube.com/'});await chrome.scripting.executeScript({target:{tabId:tab.id},func:()=>globalThis.__ytProgressCustomizer.dispose()});});
     await page.waitForFunction(()=>!document.querySelector('#yt-custom-progress-style'));

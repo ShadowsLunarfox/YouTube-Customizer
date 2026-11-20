@@ -1288,7 +1288,7 @@
     childList: true, subtree: true,
     ...(!isMusic && { attributes: true,
       attributeFilter: ["style", "class", "hidden", "aria-hidden", "role", "has-paygated-featured-badge", "is-shorts",
-        "is-playables", "is-mini-game-card-shelf", "is-game-card-shelf", "is-active", "video-id"] })
+        "is-playables", "is-mini-game-card-shelf", "is-game-card-shelf", "is-active", "video-id", "page-subtype"] })
   });
 
   const shortsEvents = ["yt-navigate-finish", "yt-page-data-updated", "fullscreenchange", "visibilitychange", "play", "loadeddata"];

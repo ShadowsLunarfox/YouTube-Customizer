@@ -353,8 +353,15 @@
     }
 
     function refresh() {
-      const active = !disposed && enabled && window === window.top && location.pathname === '/';
-      const next = active ? document.querySelector(HOME + ':not([hidden])') : null;
+      if (disposed || !enabled || window !== window.top) { detach(); return; }
+      if (location.pathname !== '/') {
+        // YouTube can update the URL before it hides Home. Removing the
+        // grid markers while Home is still visible makes the feed reflow.
+        if (home && (!home.isConnected || !home.matches(HOME) ||
+            home.closest('[hidden]') || !home.checkVisibility({ visibilityProperty: true }))) detach();
+        return;
+      }
+      const next = document.querySelector(HOME + ':not([hidden])');
       if (next === home && home?.isConnected) return;
       detach();
       if (!next) return;
@@ -378,10 +385,14 @@
 
     function handleMutations(records) {
       if (disposed || !enabled) return;
-      if (location.pathname !== '/') { if (home) detach(); return; }
-      if (home?.isConnected) return;
-      // Bootstrap a Home renderer that mounts after initial settings/navigation.
-      if (records.some(record => record.type === 'childList')) refresh();
+      if (home?.isConnected) {
+        // Changes to the outgoing renderer or its ancestors can hide Home.
+        // Ignore unrelated player and destination mutations.
+        if (location.pathname !== '/' && records.some(record => record.target.contains(home))) refresh();
+        return;
+      }
+      // Clean up a removed renderer or find one mounted after navigation.
+      if (home || location.pathname === '/' && records.some(record => record.type === 'childList')) refresh();
     }
 
     return Object.freeze({ sync, refresh, handleMutations, dispose() { disposed = true; detach(); } });

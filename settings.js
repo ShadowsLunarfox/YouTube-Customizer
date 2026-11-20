@@ -306,7 +306,7 @@
   }
 
   globalThis.YTCustomizer = Object.freeze({
-    version: "168", defaults, assetDefaults, presets, tabKeys, audioKeys, normalize, normalizeAssets,
+    version: "169", defaults, assetDefaults, presets, tabKeys, audioKeys, normalize, normalizeAssets,
     pageScopes, profileKeys, cardKeys, normalizeProfiles, normalizePageAssets, pageScope, resolveSettings, resolveAssets, createBackup, parseBackup,
     isImageData, isBackgroundData, isYouTubeUrl, isSettingsPageUrl, iconDataUri,
     hasExtensionContext, sendRuntimeMessage, removeExtensionListener, isNativeFullscreenKey

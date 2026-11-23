@@ -15,6 +15,11 @@
   const UNIVERSAL_GLASS_ATTR = "data-ytc-universal-glass";
   const UNIVERSAL_GLASS_CLEAR_ATTR = "data-ytc-universal-clear";
   const GLASS_BACKDROP = "var(--ytc-ui-backdrop)";
+  const MENU_SURFACES = ["ytd-menu-popup-renderer", "ytd-multi-page-menu-renderer", ".ytp-popup"];
+  const NATIVE_MENU_SELECTOR = [...MENU_SURFACES, "ytd-popup-container > tp-yt-iron-dropdown",
+    'ytd-popup-container [role="menu"]'].join(",");
+  const MENU_REPAIR_PROPERTIES = ["background", "box-shadow", "backdrop-filter", "filter", "color"];
+  const MENU_REPAIR_SELECTOR = `[style*="!"], [${UNIVERSAL_GLASS_ATTR}], [${UNIVERSAL_GLASS_CLEAR_ATTR}]`;
   // Avatar links/buttons keep their native circular image, not a glass tile.
   const COMMENT_AVATAR_SELECTOR = 'ytd-comments :is(#author-thumbnail, #author-thumbnail-button, #creator-heart-button, #hearted-thumbnail), ' +
     'ytd-comments :is(#author-thumbnail, #creator-heart-button) :is(a, button, yt-img-shadow)';
@@ -70,6 +75,10 @@
   // alone in both CSS and inline repair, including their nested controls.
   const CLOSED_DIALOG_SELECTOR = `:is(${DIALOG_SURFACE_SELECTOR}):is([hidden], [aria-hidden="true"], [style*="display: none"], [style*="display:none"])`;
   const ACTIVE_DIALOG_CONTEXT = `:not(:where(${CLOSED_DIALOG_SELECTOR}, :is(${CLOSED_DIALOG_SELECTOR}) *))`;
+  // Share refits its popup and updates its controls during hydration. CSS can
+  // theme it without writing inline styles back into that native layout pass.
+  const SHARE_DIALOG_SELECTOR = `:is(tp-yt-paper-dialog, [role="dialog"]):has(> :is(yt-unified-share-panel-renderer, ytd-unified-share-panel-renderer))`;
+  const UNMANAGED_DIALOG_SELECTOR = `${CLOSED_DIALOG_SELECTOR}, ${SHARE_DIALOG_SELECTOR}`;
   const DIALOG_CONTENT_SELECTOR = `:is(${DIALOG_SURFACE_SELECTOR}) :is(
     .ytContextualSheetLayoutHeaderContainer, .ytContextualSheetLayoutContentContainer,
     .ytContextualSheetLayoutFooterContainer, .ytSpecDialogLayoutContainer,
@@ -212,11 +221,11 @@
     "ytd-feed-nudge-renderer #content-wrapper",
     "ytd-comments", "ytd-watch-next-secondary-results-renderer", "ytd-playlist-panel-renderer",
     "ytd-playlist-sidebar-renderer", "ytd-live-chat-frame", "yt-live-chat-renderer",
-    "ytd-menu-popup-renderer", "ytd-multi-page-menu-renderer", ...DIALOG_SURFACE_SELECTORS,
+    ...MENU_SURFACES, ...DIALOG_SURFACE_SELECTORS,
     "ytd-voice-search-dialog-renderer #voice-search-dialog",
     "ytd-tabbed-page-header", "ytd-c4-tabbed-header-renderer", "ytd-playlist-header-renderer",
     "yt-page-header-renderer", "yt-page-header-view-model",
-    ".ytp-popup", "tp-yt-paper-tooltip #tooltip",
+    "tp-yt-paper-tooltip #tooltip",
     // Modern volume controls paint one capsule; its hover pseudo layer stays clear.
     ".html5-video-player.ytp-delhi-modern.ytp-delhi-horizontal-volume-controls .ytp-volume-area",
     ".html5-video-player.ytp-delhi-modern .ytp-volume-popover",
@@ -358,6 +367,12 @@
     ${WATCH_FILTER_BAR_SELECTOR} :is(yt-chip-cloud-chip-renderer, .ytSpecButtonShapeNextHost)`;
   const HOMEPAGE_SCOPE_SELECTOR = 'ytd-browse[page-subtype="home"]';
   const LIVE_CHAT_SHADOW_STYLE_ATTR = "data-ytc-live-chat-surface";
+  // Emit contextual surfaces as individual selectors so Chromium can index
+  // each one by its target instead of checking a large :is() on unrelated nodes.
+  function themedSurfaces(selectors, suffix = "") {
+    return selectors.map(selector => `html[data-ytc-theme] :is(${selector})${suffix}`).join(",\n    ");
+  }
+
   function buildButtonCss(scope = 'html[data-ytc-theme] body') {
     const lightingOwner = ':is(button, [role="button"], button-view-model, yt-button-view-model, yt-button-shape, ' +
       '.ytSpecButtonViewModelHost, segmented-like-dislike-button-view-model, ytd-button-renderer, ' +
@@ -520,7 +535,7 @@
     const removedRoots = new Set();
     const ownStyleValues = new WeakMap();
     const dialogRoots = new WeakSet();
-    const closedDialogs = new WeakSet();
+    const unmanagedDialogs = new WeakSet();
     const glassStyles = new Map();
     const homepageStyles = new Map();
 
@@ -571,12 +586,17 @@
       }
     }
 
+    function releaseGlassElement(element) {
+      if (!glassStyles.has(element)) return;
+      restoreElement(glassStyles, element);
+      element.removeAttribute(UNIVERSAL_GLASS_ATTR);
+      element.removeAttribute(UNIVERSAL_GLASS_CLEAR_ATTR);
+      dialogRoots.delete(element);
+    }
+
     function pruneDetachedSurfaces() {
       for (const [element] of glassStyles) {
-        if (element.isConnected) continue;
-        restoreElement(glassStyles, element);
-        element.removeAttribute(UNIVERSAL_GLASS_ATTR);
-        element.removeAttribute(UNIVERSAL_GLASS_CLEAR_ATTR);
+        if (!element.isConnected) releaseGlassElement(element);
       }
       // Homepage fallback surfaces are separate from universal glass. Retaining
       // their original styles used to keep every retired feed subtree alive.
@@ -587,12 +607,7 @@
 
     function releaseSurfaceSubtree(root) {
       const release = element => {
-        if (glassStyles.has(element)) {
-          restoreElement(glassStyles, element);
-          element.removeAttribute(UNIVERSAL_GLASS_ATTR);
-          element.removeAttribute(UNIVERSAL_GLASS_CLEAR_ATTR);
-          dialogRoots.delete(element);
-        }
+        releaseGlassElement(element);
         if (homepageStyles.has(element)) restoreElement(homepageStyles, element);
       };
       release(root);
@@ -614,11 +629,11 @@
       }
     }
 
-    function releaseClosedDialog(root, record) {
-      const known = closedDialogs.has(root);
-      if (!known) { closedDialogs.add(root); releaseSurfaceSubtree(root); }
+    function releaseUnmanagedDialog(root, record) {
+      const known = unmanagedDialogs.has(root);
+      if (!known) { unmanagedDialogs.add(root); releaseSurfaceSubtree(root); }
       if (record?.type === 'childList') {
-        // Cached forms can replace content or receive previously styled nodes.
+        // Unmanaged dialogs can receive nodes from another, styled subtree.
         if (known) for (const node of record.addedNodes) if (node instanceof Element) releaseSurfaceSubtree(node);
         pruneRemovedSurfaces(new Set([...record.removedNodes].filter(node => node instanceof Element)));
       }
@@ -645,12 +660,32 @@
       return color !== "transparent" ? GLASS_BACKDROP : "none";
     }
 
+    function menuNeedsInlineRepair(element) {
+      if (!element.getAttribute("style")?.includes("!")) return false;
+      const { style } = element;
+      const applied = glassStyles.get(element);
+      return MENU_REPAIR_PROPERTIES.some(property => {
+        if (style.getPropertyPriority(property) !== "important") return false;
+        const original = applied?.get(property);
+        return !original || original.priority === "important" ||
+          style.getPropertyValue(property) !== original.applied;
+      }) || !style.getPropertyPriority("background") &&
+        (style.getPropertyPriority("background-color") === "important" ||
+          style.getPropertyPriority("background-image") === "important");
+    }
+
     // Background shorthand is intentional: YouTube frequently restores black with `background`,
     // so override that single declaration without mixing its longhand properties inline.
     function forceSurface(store, element, color, attributes = []) {
-      const closed = element.closest(CLOSED_DIALOG_SELECTOR);
-      if (closed) { releaseClosedDialog(closed); return; }
-      closedDialogs.delete(element);
+      const unmanaged = element.closest(UNMANAGED_DIALOG_SELECTOR);
+      if (unmanaged) { releaseUnmanagedDialog(unmanaged); return; }
+      unmanagedDialogs.delete(element);
+      // Dropdown and player menus resize and replace their rows as they open.
+      // The stylesheet is enough unless a native inline !important overrides it.
+      if (element.closest(NATIVE_MENU_SELECTOR) && !menuNeedsInlineRepair(element)) {
+        releaseGlassElement(element);
+        return;
+      }
       const backdrop = surfaceBackdrop(element, color);
       forceStyle(store, element, "background", color);
       forceStyle(store, element, "box-shadow", "none");
@@ -744,14 +779,17 @@
         pruneRemovedSurfaces(retired);
         for (const root of roots) {
           if (!root.isConnected) continue;
+          const unmanaged = root.closest(UNMANAGED_DIALOG_SELECTOR);
+          if (unmanaged) { releaseUnmanagedDialog(unmanaged); continue; }
           // A newly inserted comment often reports both its parent and its children in one batch.
           let nested = false;
           for (let parent = root.parentElement; parent; parent = parent.parentElement) {
             if (roots.has(parent)) { nested = true; break; }
           }
           if (nested) continue;
-          elements.add(root);
-          root.querySelectorAll(GLASS_UPDATE_SELECTOR).forEach(element => elements.add(element));
+          const menu = root.closest(NATIVE_MENU_SELECTOR);
+          if (!menu || root.matches(MENU_REPAIR_SELECTOR)) elements.add(root);
+          root.querySelectorAll(menu ? MENU_REPAIR_SELECTOR : GLASS_UPDATE_SELECTOR).forEach(element => elements.add(element));
         }
         const visited = new Set();
         elements.forEach(element => updateGlassElement(element, visited));
@@ -784,12 +822,7 @@
         forceSurface(glassStyles, element, "transparent", [UNIVERSAL_GLASS_CLEAR_ATTR]);
       } else if (element.matches(UNIVERSAL_GLASS_TARGET_SELECTOR)) {
         forceSurface(glassStyles, element, "var(--ytc-universal-glass)", [UNIVERSAL_GLASS_ATTR]);
-      } else if (glassStyles.has(element)) {
-        restoreElement(glassStyles, element);
-        element.removeAttribute(UNIVERSAL_GLASS_ATTR);
-        element.removeAttribute(UNIVERSAL_GLASS_CLEAR_ATTR);
-        dialogRoots.delete(element);
-      }
+      } else releaseGlassElement(element);
     }
 
     function scheduleGlassUpdate(immediate = false) {
@@ -916,7 +949,7 @@
       // Mutation records describe the final DOM state; repeated writes to the same
       // player's style/class in one frame need only one check per attribute.
       const seenAttributes = new WeakMap();
-      const closedAncestors = new WeakMap();
+      const unmanagedAncestors = new WeakMap();
       for (const record of records) {
         const target = record.target;
         if (!(target instanceof Element)) continue;
@@ -928,14 +961,16 @@
         }
         if (record.type === "attributes" && record.attributeName === "style" &&
             ownStyleValues.get(target) === target.getAttribute("style")) continue;
-        const candidate = glassEnabled() && (glassStyles.has(target) || closedDialogs.has(target) || mightBeGlassElement(target));
+        const candidate = glassEnabled() && (glassStyles.has(target) || unmanagedDialogs.has(target) || mightBeGlassElement(target));
         if (record.type === 'childList' || candidate) {
-          if (!closedAncestors.has(target)) closedAncestors.set(target, target.closest(CLOSED_DIALOG_SELECTOR));
-          const closed = closedAncestors.get(target);
-          if (closed) { releaseClosedDialog(closed, record); continue; }
-          // Visibility can change without a paint or class change.
-          if (closedDialogs.has(target)) { closedDialogs.delete(target); glassRoots.add(target); }
+          if (!unmanagedAncestors.has(target)) unmanagedAncestors.set(target, target.closest(UNMANAGED_DIALOG_SELECTOR));
+          const unmanaged = unmanagedAncestors.get(target);
+          if (unmanaged) { releaseUnmanagedDialog(unmanaged, record); continue; }
+          // A cached shell can reopen or be reused for a different dialog.
+          if (unmanagedDialogs.delete(target)) glassRoots.add(target);
         }
+        if (record.type === "attributes" && candidate && !glassStyles.has(target) &&
+            target.closest(NATIVE_MENU_SELECTOR) && !menuNeedsInlineRepair(target)) continue;
         if (record.type === "childList") {
           let changedElements = false;
           for (const node of record.addedNodes) {
@@ -1712,7 +1747,7 @@
     html[data-ytc-theme][data-ytc-blur] ytd-watch-flexy :is(#below, #secondary) {
       view-transition-name: none !important;
     }
-    html[data-ytc-theme] :is(${UNIVERSAL_GLASS_TARGET_SELECTOR})${ACTIVE_DIALOG_CONTEXT} {
+    ${themedSurfaces(UNIVERSAL_GLASS_TARGET_SELECTORS, ACTIVE_DIALOG_CONTEXT)} {
       background: var(--ytc-universal-glass) !important;
       box-shadow: none !important;
       backdrop-filter: ${GLASS_BACKDROP} !important;
@@ -1790,7 +1825,7 @@
       border-radius: 16px !important;
     }
     html[data-ytc-theme] :is(${COMMENT_AVATAR_SELECTOR}) { border-radius: 50% !important; }
-    html[data-ytc-theme] :is(${UNIVERSAL_GLASS_CLEAR_SELECTOR})${ACTIVE_DIALOG_CONTEXT} {
+    ${themedSurfaces(UNIVERSAL_GLASS_CLEAR_SELECTORS, ACTIVE_DIALOG_CONTEXT)} {
       background: transparent !important;
       box-shadow: none !important;
       backdrop-filter: none !important;
@@ -1798,13 +1833,13 @@
     html[data-ytc-theme] :is(${SHARED_BACKDROP_SELECTOR}) {
       backdrop-filter: none !important;
     }
-    html[data-ytc-theme] :is(${UNIVERSAL_GLASS_TARGET_SELECTOR}):is(ytd-masthead:has(> #background)) {
+    html[data-ytc-theme] ytd-masthead:has(> #background) {
       backdrop-filter: none !important;
     }
-    html[data-ytc-theme] :is(${UNIVERSAL_GLASS_CLEAR_SELECTOR}):is(${FROSTED_WRAPPER_SELECTOR}) {
+    html[data-ytc-theme] :is(${FROSTED_WRAPPER_SELECTOR}) {
       backdrop-filter: ${GLASS_BACKDROP} !important;
     }
-    html[data-ytc-theme] :is(${UNIVERSAL_GLASS_CLEAR_SELECTOR}):is(${MASTHEAD_BACKDROP_SELECTOR}) {
+    html[data-ytc-theme] ${MASTHEAD_BACKDROP_SELECTOR} {
       display: block !important;
       opacity: 1 !important;
     }
@@ -1817,8 +1852,12 @@
       backdrop-filter: none !important;
       filter: none !important;
     }
-    html[data-ytc-theme] :is(${UNIVERSAL_GLASS_TARGET_SELECTOR}, ${UNIVERSAL_GLASS_CLEAR_SELECTOR}):not(:is(${BUTTON_ELEMENTS}))${ACTIVE_DIALOG_CONTEXT}::before,
-    html[data-ytc-theme] :is(${UNIVERSAL_GLASS_TARGET_SELECTOR}, ${UNIVERSAL_GLASS_CLEAR_SELECTOR}):not(:is(${BUTTON_ELEMENTS}))${ACTIVE_DIALOG_CONTEXT}::after {
+    html[data-ytc-theme] [${UNIVERSAL_GLASS_ATTR}]:not(${BUTTON_MATCH_SELECTOR})::before,
+    html[data-ytc-theme] [${UNIVERSAL_GLASS_ATTR}]:not(${BUTTON_MATCH_SELECTOR})::after,
+    html[data-ytc-theme] [${UNIVERSAL_GLASS_CLEAR_ATTR}]:not(${BUTTON_MATCH_SELECTOR})::before,
+    html[data-ytc-theme] [${UNIVERSAL_GLASS_CLEAR_ATTR}]:not(${BUTTON_MATCH_SELECTOR})::after,
+    html[data-ytc-theme] :is(${MENU_SURFACES.join(",")}, ${SHARE_DIALOG_SELECTOR})::before,
+    html[data-ytc-theme] :is(${MENU_SURFACES.join(",")}, ${SHARE_DIALOG_SELECTOR})::after {
       background: transparent !important;
       box-shadow: none !important;
       backdrop-filter: none !important;

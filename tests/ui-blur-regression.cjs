@@ -153,7 +153,10 @@ const chatFixture = `<!doctype html><html><head><style>
             [...document.querySelectorAll("[data-blurred]")].every(element => {
               const style = getComputedStyle(element);
               const parts = style.backgroundColor.match(/[\d.]+/g).map(Number);
-              return element.hasAttribute("data-ytc-universal-glass") &&
+              const themeOwnership = element.matches('ytd-menu-popup-renderer')
+                ? !element.style.backdropFilter
+                : element.hasAttribute("data-ytc-universal-glass");
+              return themeOwnership &&
                 (style.backdropFilter === expectedBlur || value === 0 && style.backdropFilter === "none") &&
                 (parts.length === 4 ? parts[3] : 1) === opacity / 100 && style.filter === "none" && style.opacity === "1";
             }) && [...document.querySelectorAll("[data-frosted-wrapper]")].every(element => {
